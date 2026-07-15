@@ -6,6 +6,7 @@ import { sec004Cors } from './sec004_cors.js';
 import { sec005Crypto } from './sec005_crypto.js';
 import { sec006Cookies } from './sec006_cookies.js';
 import { sec007SqlInjection } from './sec007_sql_injection.js';
+import { sec008CommandInjection } from './sec008_command_injection.js';
 
 export const rules: Rule[] = [
   sec001Secrets,
@@ -14,7 +15,8 @@ export const rules: Rule[] = [
   sec004Cors,
   sec005Crypto,
   sec006Cookies,
-  sec007SqlInjection
+  sec007SqlInjection,
+  sec008CommandInjection
 ];
 
 export * from './types.js';

@@ -7,3 +7,8 @@ export const TAINT_SINKS = {
   // Danger-prone query execution methods on database clients
   methods: ['query', 'execute', 'raw']
 };
+
+export const COMMAND_SINKS = {
+  // Danger-prone shell execution methods
+  methods: ['exec', 'execSync']
+};
