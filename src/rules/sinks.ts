@@ -12,3 +12,11 @@ export const COMMAND_SINKS = {
   // Danger-prone shell execution methods
   methods: ['exec', 'execSync']
 };
+
+export const PATH_SINKS = {
+  // Common file system module/promise names
+  receivers: ['fs', 'promises', 'fsp'],
+  
+  // File operations that accept system paths
+  methods: ['readFile', 'readFileSync', 'writeFile', 'writeFileSync', 'createReadStream', 'createWriteStream']
+};
