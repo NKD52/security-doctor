@@ -182,4 +182,57 @@ describe('SEC007: SQL Injection Taint Tracking', () => {
     expect(untaintedFindings[0].ruleId).toBe('SEC002');
     expect(untaintedFindings[0].severity).toBe('high');
   });
+
+  it('SEC009: should flag positive Path Traversal cases including unsafe startsWith prefix checks', () => {
+    const code = `
+      // Positive Case 1: Unsanitized File Access
+      app.get('/read', (req, res) => {
+        const file = req.query.file;
+        fs.readFile(file, 'utf8', (err, data) => {});
+      });
+
+      // Positive Case 2: Insecure startsWith prefix check (no trailing separator)
+      app.get('/read', (req, res) => {
+        const file = req.query.file;
+        const safePath = path.resolve('/var/www/uploads', file);
+        if (safePath.startsWith('/var/www/uploads')) { // Vulnerable to uploads-evil prefix bypass
+          fs.readFile(safePath, 'utf8', (err, data) => {});
+        }
+      });
+    `;
+
+    const findings = scanner.scanFile('test-path-vulnerable.ts', code);
+    expect(findings.length).toBe(2);
+    
+    expect(findings[0].ruleId).toBe('SEC009');
+    expect(findings[0].severity).toBe('critical');
+    
+    expect(findings[1].ruleId).toBe('SEC009');
+    expect(findings[1].severity).toBe('critical');
+  });
+
+  it('SEC009: should NOT flag safe Path Traversal cases (proper startsWith checks, safe path.sep checks)', () => {
+    const code = `
+      // Negative Case 1: Path resolved and verified using startsWith with trailing slash
+      app.get('/read', (req, res) => {
+        const file = req.query.file;
+        const safePath = path.resolve('/var/www/uploads', file);
+        if (safePath.startsWith('/var/www/uploads/')) { // Safe trailing slash
+          fs.readFile(safePath, 'utf8', (err, data) => {});
+        }
+      });
+
+      // Negative Case 2: Path resolved and verified using startsWith + path.sep
+      app.get('/read', (req, res) => {
+        const file = req.query.file;
+        const safePath = path.resolve(base, file);
+        if (safePath.startsWith(base + path.sep)) { // Safe path.sep
+          fs.readFile(safePath, 'utf8', (err, data) => {});
+        }
+      });
+    `;
+
+    const findings = scanner.scanFile('test-path-safe.ts', code);
+    expect(findings.length).toBe(0);
+  });
 });
