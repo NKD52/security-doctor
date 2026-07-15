@@ -47,12 +47,13 @@ export function isSourceNode(node: any): boolean {
 export function expressionContainsTaint(node: any, taintedVars: Set<string>): boolean {
   if (!node) return false;
 
-  // Short-circuit if it's a recognized sanitizer
+  // Short-circuit if it's a recognized sanitizer, otherwise propagate taint from arguments
   if (node.type === 'CallExpression') {
     const callee = node.callee;
     if (callee.type === 'Identifier' && SANITIZERS.includes(callee.name)) {
       return false;
     }
+    return node.arguments.some((arg: any) => expressionContainsTaint(arg, taintedVars));
   }
 
   if (node.type === 'Identifier') {
@@ -91,6 +92,26 @@ export function isSinkCall(node: any, customReceivers?: string[]): boolean {
       ? [...new Set([...TAINT_SINKS.receivers, ...customReceivers])] 
       : TAINT_SINKS.receivers;
     return allowedReceivers.includes(receiver) && TAINT_SINKS.methods.includes(method);
+  }
+  return false;
+}
+
+export function isSafeBoundaryArg(node: any): boolean {
+  if (!node) return false;
+  if (node.type === 'StringLiteral') {
+    return node.value.endsWith('/') || node.value.endsWith('\\');
+  }
+  if (node.type === 'BinaryExpression' && node.operator === '+') {
+    return isSafeBoundaryArg(node.right) || isSafeBoundaryArg(node.left);
+  }
+  if (
+    node.type === 'MemberExpression' &&
+    node.object.type === 'Identifier' &&
+    node.object.name === 'path' &&
+    node.property.type === 'Identifier' &&
+    node.property.name === 'sep'
+  ) {
+    return true;
   }
   return false;
 }
