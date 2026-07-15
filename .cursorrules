@@ -1,0 +1,13 @@
+# My Project Rules
+- Follow standard coding guidelines.
+
+
+### AI Security Guidelines (via security-doctor)
+
+To prevent security vulnerabilities, always adhere to the following guidelines during code generation and modification:
+1. **No Hardcoded Secrets (SEC001)**: Never hardcode api keys, secrets, passwords, or private keys. Always reference them from environment variables (e.g. `process.env`).
+2. **Safe Dynamic Execution (SEC002)**: Do not use `eval()`, `new Function()`, or `child_process.exec()` with unsanitized dynamic strings. Prefer `JSON.parse()` or `child_process.spawn()` with separate arguments.
+3. **Enforce SSL/TLS Verification (SEC003)**: Do not set `rejectUnauthorized: false` or set `NODE_TLS_REJECT_UNAUTHORIZED = 0`.
+4. **Secure CORS Configurations (SEC004)**: Avoid configuring wildcards like `origin: '*'` or `Access-Control-Allow-Origin: '*'` for authenticated endpoints.
+5. **Strong Cryptography (SEC005)**: Do not use weak/outdated hash algorithms (MD5, SHA1). Use SHA-256, SHA-512, or bcrypt/argon2.
+6. **Secure Session Cookies (SEC006)**: Always set `httpOnly: true` and `secure: true` when creating cookies to mitigate XSS and session hijacking.
