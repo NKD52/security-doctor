@@ -1,18 +1,32 @@
 import { Rule } from './types.js';
-import { isSourceNode, expressionContainsTaint, isSinkCall, extractIdentifiers } from '../utils/taint.js';
+import { COMMAND_SINKS } from './sinks.js';
+import { isSourceNode, expressionContainsTaint, extractIdentifiers } from '../utils/taint.js';
 
-export const sec007SqlInjection: Rule = {
-  id: 'SEC007',
+export function isCommandSinkCall(node: any): boolean {
+  if (!node || node.type !== 'CallExpression') return false;
+  const callee = node.callee;
+  if (callee.type === 'Identifier') {
+    return COMMAND_SINKS.methods.includes(callee.name);
+  }
+  if (
+    callee.type === 'MemberExpression' &&
+    callee.property.type === 'Identifier'
+  ) {
+    return COMMAND_SINKS.methods.includes(callee.property.name);
+  }
+  return false;
+}
+
+export const sec008CommandInjection: Rule = {
+  id: 'SEC008',
   severity: 'critical',
-  description: 'Detects potential SQL Injection vulnerabilities from untrusted user inputs flowing into raw database queries.',
+  description: 'Detects potential command injection vulnerabilities where untrusted user input flows into a system shell execution call.',
   createVisitor(context) {
     function analyzeFunction(path: any) {
       const taintedVars = new Set<string>();
 
-      // Traverse the local function body scope
       path.traverse({
         VariableDeclarator(declPath: any) {
-          // Avoid descending into nested functions to prevent variable leakage/crossover
           if (declPath.getFunctionParent() !== path) return;
 
           const { id, init } = declPath.node;
@@ -53,15 +67,15 @@ export const sec007SqlInjection: Rule = {
         CallExpression(callPath: any) {
           if (callPath.getFunctionParent() !== path) return;
 
-          if (isSinkCall(callPath.node, context.config?.dbClients)) {
+          if (isCommandSinkCall(callPath.node)) {
             const args = callPath.node.arguments;
             if (args.length > 0) {
-              const queryArg = args[0];
-              if (expressionContainsTaint(queryArg, taintedVars)) {
+              const cmdArg = args[0];
+              if (expressionContainsTaint(cmdArg, taintedVars)) {
                 context.report(
                   callPath,
-                  'Potential SQL Injection vulnerability. Untrusted user input is concatenated or interpolated directly into a database query.',
-                  'Use parameterized queries (prepared statements) or ORM execution methods instead of concatenating strings.'
+                  'Potential Command Injection vulnerability. Untrusted user input flows directly into a system execution command.',
+                  'Use execFile() or spawn() with safe arguments arrays instead of concatenating strings for system shell execution.'
                 );
               }
             }

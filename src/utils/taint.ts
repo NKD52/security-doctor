@@ -3,6 +3,32 @@ import { TAINT_SINKS } from '../rules/sinks.js';
 
 const SANITIZERS = ['parseInt', 'parseFloat', 'Number'];
 
+export function extractIdentifiers(node: any): string[] {
+  if (!node) return [];
+  if (node.type === 'Identifier') {
+    return [node.name];
+  }
+  if (node.type === 'ObjectPattern') {
+    const names: string[] = [];
+    for (const prop of node.properties) {
+      if (prop.type === 'ObjectProperty' && prop.value.type === 'Identifier') {
+        names.push(prop.value.name);
+      }
+    }
+    return names;
+  }
+  if (node.type === 'ArrayPattern') {
+    const names: string[] = [];
+    for (const elem of node.elements) {
+      if (elem && elem.type === 'Identifier') {
+        names.push(elem.name);
+      }
+    }
+    return names;
+  }
+  return [];
+}
+
 export function isSourceNode(node: any): boolean {
   if (!node) return false;
   if (node.type === 'MemberExpression') {
