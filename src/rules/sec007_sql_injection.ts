@@ -79,7 +79,7 @@ export const sec007SqlInjection: Rule = {
         CallExpression(callPath: any) {
           if (callPath.getFunctionParent() !== path) return;
 
-          if (isSinkCall(callPath.node)) {
+          if (isSinkCall(callPath.node, context.config?.dbClients)) {
             const args = callPath.node.arguments;
             if (args.length > 0) {
               const queryArg = args[0];

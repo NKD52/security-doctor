@@ -14,10 +14,18 @@ export interface Finding {
   suggestedFix?: string;
 }
 
+export interface Config {
+  ignorePaths?: string[];
+  rules?: Record<string, 'off' | 'warn' | 'error' | string>;
+  ignoredSecrets?: string[];
+  dbClients?: string[];
+}
+
 export interface RuleContext {
   filePath: string;
   report: (nodePath: any, message: string, suggestedFix?: string) => void;
   reportAt: (line: number, column: number, message: string, suggestedFix?: string) => void;
+  config?: Config;
 }
 
 export interface Rule {

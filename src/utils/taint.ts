@@ -51,7 +51,7 @@ export function expressionContainsTaint(node: any, taintedVars: Set<string>): bo
   return false;
 }
 
-export function isSinkCall(node: any): boolean {
+export function isSinkCall(node: any, customReceivers?: string[]): boolean {
   if (!node || node.type !== 'CallExpression') return false;
   const callee = node.callee;
   if (
@@ -61,7 +61,10 @@ export function isSinkCall(node: any): boolean {
   ) {
     const receiver = callee.object.name;
     const method = callee.property.name;
-    return TAINT_SINKS.receivers.includes(receiver) && TAINT_SINKS.methods.includes(method);
+    const allowedReceivers = customReceivers 
+      ? [...new Set([...TAINT_SINKS.receivers, ...customReceivers])] 
+      : TAINT_SINKS.receivers;
+    return allowedReceivers.includes(receiver) && TAINT_SINKS.methods.includes(method);
   }
   return false;
 }

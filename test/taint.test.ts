@@ -64,4 +64,29 @@ describe('SEC007: SQL Injection Taint Tracking', () => {
     const findings = scanner.scanFile('test-safe.ts', code);
     expect(findings.length).toBe(0);
   });
+
+  it('should respect custom dbClients configured via Scanner options', () => {
+    const code = `
+      function getUser(req, res) {
+        const id = req.query.id;
+        const query = \`SELECT * FROM users WHERE id = \${id}\`;
+        customClient.query(query);
+      }
+    `;
+
+    // Without config override, customClient is not recognized as a database client (0 findings)
+    const findingsDefault = scanner.scanFile('test-custom.ts', code);
+    expect(findingsDefault.length).toBe(0);
+
+    // With config override, customClient is recognized and flags a finding (1 finding)
+    const customScanner = new Scanner({
+      config: {
+        dbClients: ['customClient']
+      }
+    });
+    const findingsWithConfig = customScanner.scanFile('test-custom.ts', code);
+    expect(findingsWithConfig.length).toBe(1);
+    expect(findingsWithConfig[0].ruleId).toBe('SEC007');
+    expect(findingsWithConfig[0].severity).toBe('critical');
+  });
 });
