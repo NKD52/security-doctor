@@ -24,8 +24,10 @@ export function isPathSinkCall(node: any): boolean {
 
 export const sec009PathTraversal: Rule = {
   id: 'SEC009',
+  title: 'Prevent Path Traversal',
   severity: 'critical',
   description: 'Detects potential path traversal vulnerabilities where untrusted user input flows into a file system operation.',
+  agentInstruction: 'Resolve and verify boundaries before accessing paths. Use path.resolve() combined with startsWith() verification containing a trailing separator.',
   createVisitor(context) {
     function analyzeFunction(path: any) {
       const taintedVars = new Set<string>();

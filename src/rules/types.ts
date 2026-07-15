@@ -30,7 +30,9 @@ export interface RuleContext {
 
 export interface Rule {
   id: string;
+  title: string;
   severity: Severity;
   description: string;
+  agentInstruction?: string;
   createVisitor: (context: RuleContext) => Visitor;
 }

@@ -2,8 +2,10 @@ import { Rule } from './types.js';
 
 export const sec004Cors: Rule = {
   id: 'SEC004',
+  title: 'Secure CORS Configurations',
   severity: 'medium',
   description: 'Detects insecure CORS wildcard configurations allowing any origin (e.g. origin: "*").',
+  agentInstruction: "Avoid configuring wildcards like origin: '*' or Access-Control-Allow-Origin: '*' for authenticated endpoints.",
   createVisitor(context) {
     return {
       ObjectProperty(path) {
