@@ -4,16 +4,10 @@ import { parse } from '@babel/parser';
 import _traverse from '@babel/traverse';
 import fg from 'fast-glob';
 import { rules } from './rules/index.js';
-import { Finding, Rule, RuleContext } from './rules/types.js';
+import { Finding, Rule, RuleContext, Config } from './rules/types.js';
 
 // Workaround for Babel traverse ESM/CJS import issues
 const traverse = (_traverse as any).default || _traverse;
-
-export interface Config {
-  ignorePaths?: string[];
-  rules?: Record<string, 'off' | 'warn' | 'error' | string>;
-  ignoredSecrets?: string[];
-}
 
 export function loadConfig(cwd: string = process.cwd()): Config {
   const configPath = path.resolve(cwd, 'security-doctor.config.json');
@@ -155,7 +149,8 @@ export class Scanner {
             startColumn: column,
             suggestedFix
           });
-        }
+        },
+        config: this.config
       };
 
       const visitor = rule.createVisitor(context);
