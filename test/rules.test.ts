@@ -208,3 +208,71 @@ describe('Diff Mode Filtering', () => {
   });
 });
 
+describe('Configuration Overrides', () => {
+  it('should respect status overrides (string and object style)', () => {
+    const code = `
+      eval("const a = 1;"); // triggers SEC002
+    `;
+
+    // 1. Default config: triggers 1 finding (SEC002)
+    const defaultScanner = new Scanner();
+    expect(defaultScanner.scanFile('test.ts', code).length).toBe(1);
+
+    // 2. String style 'off': should produce 0 findings
+    const offStringScanner = new Scanner({
+      config: {
+        rules: {
+          SEC002: 'off'
+        }
+      }
+    });
+    expect(offStringScanner.scanFile('test.ts', code).length).toBe(0);
+
+    // 3. Object style status 'off': should produce 0 findings
+    const offObjectScanner = new Scanner({
+      config: {
+        rules: {
+          SEC002: { status: 'off' }
+        }
+      }
+    });
+    expect(offObjectScanner.scanFile('test.ts', code).length).toBe(0);
+  });
+
+  it('should respect severity overrides and correctly affect health scores', () => {
+    const code = `
+      eval("const a = 1;"); // triggers SEC002
+    `;
+
+    // 1. Default SEC002 has high severity (deducts 8 points)
+    const scannerDefault = new Scanner();
+    const findingsDefault = scannerDefault.scanFile('test.ts', code);
+    expect(findingsDefault[0].severity).toBe('high');
+    expect(calculateScore(findingsDefault)).toBe(92); // 100 - 8
+
+    // 2. Override to critical (deducts 15 points)
+    const scannerCritical = new Scanner({
+      config: {
+        rules: {
+          SEC002: { severity: 'critical' }
+        }
+      }
+    });
+    const findingsCritical = scannerCritical.scanFile('test.ts', code);
+    expect(findingsCritical[0].severity).toBe('critical');
+    expect(calculateScore(findingsCritical)).toBe(85); // 100 - 15
+
+    // 3. Override to low (deducts 1 point)
+    const scannerLow = new Scanner({
+      config: {
+        rules: {
+          SEC002: { severity: 'low' }
+        }
+      }
+    });
+    const findingsLow = scannerLow.scanFile('test.ts', code);
+    expect(findingsLow[0].severity).toBe('low');
+    expect(calculateScore(findingsLow)).toBe(99); // 100 - 1
+  });
+});
+
