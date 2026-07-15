@@ -81,7 +81,15 @@ export class Scanner {
     const allFindings: Finding[] = [];
     const enabledRules = rules.filter(r => {
       const ruleConfig = this.config.rules?.[r.id];
-      return ruleConfig !== 'off';
+      if (ruleConfig) {
+        if (typeof ruleConfig === 'string') {
+          return ruleConfig !== 'off';
+        }
+        if (typeof ruleConfig === 'object') {
+          return ruleConfig.status !== 'off';
+        }
+      }
+      return true;
     });
 
     for (const filePath of entries) {
@@ -126,9 +134,14 @@ export class Scanner {
           const node = nodeOrPath && (nodeOrPath.node ? nodeOrPath.node : nodeOrPath);
           const loc = node ? node.loc : null;
           if (loc) {
+            let severity = rule.severity;
+            const ruleConfig = this.config.rules?.[rule.id];
+            if (ruleConfig && typeof ruleConfig === 'object' && ruleConfig.severity) {
+              severity = ruleConfig.severity as any;
+            }
             fileFindings.push({
               ruleId: rule.id,
-              severity: rule.severity,
+              severity,
               message,
               filePath,
               startLine: loc.start.line,
@@ -140,9 +153,14 @@ export class Scanner {
           }
         },
         reportAt: (line, column, message, suggestedFix) => {
+          let severity = rule.severity;
+          const ruleConfig = this.config.rules?.[rule.id];
+          if (ruleConfig && typeof ruleConfig === 'object' && ruleConfig.severity) {
+            severity = ruleConfig.severity as any;
+          }
           fileFindings.push({
             ruleId: rule.id,
-            severity: rule.severity,
+            severity,
             message,
             filePath,
             startLine: line,
