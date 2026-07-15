@@ -52,7 +52,13 @@ export class Scanner {
   constructor(options: ScanOptions = {}) {
     this.cwd = options.cwd || process.cwd();
     this.config = options.config || loadConfig(this.cwd);
-    this.diffLines = options.diffLines;
+    if (options.diffLines) {
+      this.diffLines = {};
+      for (const [key, value] of Object.entries(options.diffLines)) {
+        const normalizedKey = key.replace(/\\/g, '/');
+        this.diffLines[normalizedKey] = value;
+      }
+    }
   }
 
   async scan(targetDir: string = '.'): Promise<Finding[]> {
@@ -157,7 +163,8 @@ export class Scanner {
     }
 
     if (this.diffLines) {
-      const changedLines = this.diffLines[filePath];
+      const normalizedPath = filePath.replace(/\\/g, '/');
+      const changedLines = this.diffLines[normalizedPath];
       if (changedLines) {
         return fileFindings.filter(f => changedLines.has(f.startLine));
       }
