@@ -2,7 +2,7 @@ import { Rule } from './types.js';
 
 export const sec003Tls: Rule = {
   id: 'SEC003',
-  severity: 'high',
+  severity: 'critical',
   description: 'Detects disabled TLS/SSL certificate verification (e.g. rejectUnauthorized: false or NODE_TLS_REJECT_UNAUTHORIZED = 0).',
   createVisitor(context) {
     return {

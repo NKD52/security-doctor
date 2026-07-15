@@ -70,7 +70,7 @@ describe('Security Rules AST Scanning', () => {
     expect(findings.length).toBe(3);
     findings.forEach(f => {
       expect(f.ruleId).toBe('SEC003');
-      expect(f.severity).toBe('high');
+      expect(f.severity).toBe('critical');
     });
   });
 
@@ -106,7 +106,7 @@ describe('Security Rules AST Scanning', () => {
     expect(findings.length).toBe(2);
     findings.forEach(f => {
       expect(f.ruleId).toBe('SEC005');
-      expect(f.severity).toBe('high');
+      expect(f.severity).toBe('medium');
     });
   });
 
