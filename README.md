@@ -74,9 +74,9 @@ src/
 |---|---|---|
 | **SEC001** | `critical` | Hardcoded secrets (API keys, passwords) verified via Shannon entropy and format detectors. |
 | **SEC002** | `high` | Unsafe dynamic code execution (`eval()`, `new Function()`, `exec()`, `execSync()`). |
-| **SEC003** | `high` | Disabled TLS certificate verification (`rejectUnauthorized: false` or `NODE_TLS_REJECT_UNAUTHORIZED = 0`). |
+| **SEC003** | `critical` | Disabled TLS certificate verification (`rejectUnauthorized: false` or `NODE_TLS_REJECT_UNAUTHORIZED = 0`). |
 | **SEC004** | `medium` | Permissive CORS wildcard configuration (`origin: '*'` or `Access-Control-Allow-Origin: '*'`). |
-| **SEC005** | `high` | Weak or outdated cryptographic hash algorithms (`md5`, `sha1`). |
+| **SEC005** | `medium` | Weak or outdated cryptographic hash algorithms (`md5`, `sha1`). |
 | **SEC006** | `medium` | Cookie configuration missing or disabling `httpOnly` or `secure` flags. |
 
 ---

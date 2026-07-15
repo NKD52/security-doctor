@@ -23,7 +23,7 @@ export function getChangedLines(base: string, cwd: string = process.cwd()): Reco
         const match = line.match(/^diff --git a\/(.+) b\/(.+)$/);
         if (match) {
           const relativePath = match[2];
-          currentFilePath = path.resolve(cwd, relativePath);
+          currentFilePath = path.resolve(cwd, relativePath).replace(/\\/g, '/');
           result[currentFilePath] = new Set<number>();
         } else {
           currentFilePath = null;

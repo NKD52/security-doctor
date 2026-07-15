@@ -2,7 +2,7 @@ import { Rule } from './types.js';
 
 export const sec005Crypto: Rule = {
   id: 'SEC005',
-  severity: 'high',
+  severity: 'medium',
   description: 'Detects usage of weak or outdated cryptographic hash functions (MD5, SHA1).',
   createVisitor(context) {
     return {
