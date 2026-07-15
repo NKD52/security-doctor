@@ -16,7 +16,7 @@ export interface Finding {
 
 export interface Config {
   ignorePaths?: string[];
-  rules?: Record<string, 'off' | 'warn' | 'error' | string>;
+  rules?: Record<string, 'off' | string | { status?: 'on' | 'off'; severity?: Severity }>;
   ignoredSecrets?: string[];
   dbClients?: string[];
 }
@@ -30,7 +30,9 @@ export interface RuleContext {
 
 export interface Rule {
   id: string;
+  title: string;
   severity: Severity;
   description: string;
+  agentInstruction?: string;
   createVisitor: (context: RuleContext) => Visitor;
 }

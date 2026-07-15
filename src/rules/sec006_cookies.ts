@@ -2,8 +2,10 @@ import { Rule } from './types.js';
 
 export const sec006Cookies: Rule = {
   id: 'SEC006',
+  title: 'Secure Session Cookies',
   severity: 'medium',
   description: 'Detects cookie configurations missing httpOnly or secure flags.',
+  agentInstruction: 'Always set httpOnly: true and secure: true when creating cookies to mitigate XSS and session hijacking.',
   createVisitor(context) {
     return {
       CallExpression(path) {

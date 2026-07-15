@@ -19,8 +19,10 @@ export function isCommandSinkCall(node: any): boolean {
 
 export const sec008CommandInjection: Rule = {
   id: 'SEC008',
+  title: 'Prevent Command Injection',
   severity: 'critical',
   description: 'Detects potential command injection vulnerabilities where untrusted user input flows into a system shell execution call.',
+  agentInstruction: 'Use execFile() or spawn() with safe arguments arrays instead of concatenating strings for system shell execution.',
   createVisitor(context) {
     function analyzeFunction(path: any) {
       const taintedVars = new Set<string>();

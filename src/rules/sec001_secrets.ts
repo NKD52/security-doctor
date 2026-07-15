@@ -14,8 +14,10 @@ function getStringValue(node: any): string | null {
 
 export const sec001Secrets: Rule = {
   id: 'SEC001',
+  title: 'No Hardcoded Secrets',
   severity: 'critical',
   description: 'Detects hardcoded secrets, api keys, or passwords with high Shannon entropy.',
+  agentInstruction: 'Never hardcode api keys, secrets, passwords, or private keys. Always reference them from environment variables (e.g. process.env).',
   createVisitor(context) {
     return {
       VariableDeclarator(path) {

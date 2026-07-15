@@ -1,18 +1,25 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import pc from 'picocolors';
+import { rules } from './rules/index.js';
 
-const INSTRUCTION_BLOCK = `
-### AI Security Guidelines (via security-doctor)
+function getInstructionBlock(): string {
+  const lines = [
+    '### AI Security Guidelines (via security-doctor)',
+    '',
+    'To prevent security vulnerabilities, always adhere to the following guidelines during code generation and modification:'
+  ];
 
-To prevent security vulnerabilities, always adhere to the following guidelines during code generation and modification:
-1. **No Hardcoded Secrets (SEC001)**: Never hardcode api keys, secrets, passwords, or private keys. Always reference them from environment variables (e.g. \`process.env\`).
-2. **Safe Dynamic Execution (SEC002)**: Do not use \`eval()\`, \`new Function()\`, or \`child_process.exec()\` with unsanitized dynamic strings. Prefer \`JSON.parse()\` or \`child_process.spawn()\` with separate arguments.
-3. **Enforce SSL/TLS Verification (SEC003)**: Do not set \`rejectUnauthorized: false\` or set \`NODE_TLS_REJECT_UNAUTHORIZED = 0\`.
-4. **Secure CORS Configurations (SEC004)**: Avoid configuring wildcards like \`origin: '*'\` or \`Access-Control-Allow-Origin: '*'\` for authenticated endpoints.
-5. **Strong Cryptography (SEC005)**: Do not use weak/outdated hash algorithms (MD5, SHA1). Use SHA-256, SHA-512, or bcrypt/argon2.
-6. **Secure Session Cookies (SEC006)**: Always set \`httpOnly: true\` and \`secure: true\` when creating cookies to mitigate XSS and session hijacking.
-`;
+  let index = 1;
+  for (const rule of rules) {
+    if (rule.agentInstruction) {
+      lines.push(`${index}. **${rule.title} (${rule.id})**: ${rule.agentInstruction}`);
+      index++;
+    }
+  }
+
+  return lines.join('\n') + '\n';
+}
 
 export function installAgentInstructions(cwd: string = process.cwd()): void {
   let detectedCount = 0;
@@ -73,7 +80,8 @@ function updateRuleFile(filePath: string, agentName: string): void {
     }
     
     const separator = content.length > 0 ? '\n\n' : '';
-    fs.writeFileSync(filePath, content + separator + INSTRUCTION_BLOCK.trim() + '\n', 'utf8');
+    const instructionBlock = getInstructionBlock();
+    fs.writeFileSync(filePath, content + separator + instructionBlock.trim() + '\n', 'utf8');
     console.log(pc.green(`- Updated ${agentName} successfully.`));
   } catch (err) {
     console.error(pc.red(`Error writing to ${filePath}: ${(err as Error).message}`));

@@ -3,8 +3,10 @@ import { isSourceNode, expressionContainsTaint, isSinkCall, extractIdentifiers }
 
 export const sec007SqlInjection: Rule = {
   id: 'SEC007',
+  title: 'Prevent SQL Injection',
   severity: 'critical',
   description: 'Detects potential SQL Injection vulnerabilities from untrusted user inputs flowing into raw database queries.',
+  agentInstruction: 'Use parameterized queries (prepared statements) or ORM execution methods instead of concatenating strings for database queries.',
   createVisitor(context) {
     function analyzeFunction(path: any) {
       const taintedVars = new Set<string>();

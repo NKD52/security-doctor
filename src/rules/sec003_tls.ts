@@ -2,8 +2,10 @@ import { Rule } from './types.js';
 
 export const sec003Tls: Rule = {
   id: 'SEC003',
+  title: 'Enforce SSL/TLS Verification',
   severity: 'critical',
   description: 'Detects disabled TLS/SSL certificate verification (e.g. rejectUnauthorized: false or NODE_TLS_REJECT_UNAUTHORIZED = 0).',
+  agentInstruction: 'Do not set rejectUnauthorized: false or set NODE_TLS_REJECT_UNAUTHORIZED = 0.',
   createVisitor(context) {
     return {
       ObjectProperty(path) {

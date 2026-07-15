@@ -3,8 +3,10 @@ import { isSourceNode, expressionContainsTaint, extractIdentifiers } from '../ut
 
 export const sec002Eval: Rule = {
   id: 'SEC002',
+  title: 'Safe Dynamic Execution',
   severity: 'high',
   description: 'Detects unsafe execution using eval(), new Function(), or child_process exec/execSync.',
+  agentInstruction: 'Do not use eval(), new Function(), or child_process.exec() with unsanitized dynamic strings. Prefer JSON.parse() or child_process.spawn() with separate arguments.',
   createVisitor(context) {
     function analyzeFunction(path: any) {
       const taintedVars = new Set<string>();

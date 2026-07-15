@@ -80,8 +80,16 @@ export class Scanner {
 
     const allFindings: Finding[] = [];
     const enabledRules = rules.filter(r => {
-      const ruleConfig = this.config.rules?.[r.id];
-      return ruleConfig !== 'off';
+      const ruleConfig = this.config.rules?.[r.id] as any;
+      if (ruleConfig) {
+        if (typeof ruleConfig === 'string') {
+          return ruleConfig !== 'off';
+        }
+        if (typeof ruleConfig === 'object') {
+          return ruleConfig.status !== 'off';
+        }
+      }
+      return true;
     });
 
     for (const filePath of entries) {
@@ -98,8 +106,21 @@ export class Scanner {
     return allFindings;
   }
 
-  public scanFile(filePath: string, content: string, enabledRules: Rule[] = rules): Finding[] {
+  public scanFile(filePath: string, content: string, enabledRules?: Rule[]): Finding[] {
     const fileFindings: Finding[] = [];
+
+    const targetRules = enabledRules || rules.filter(r => {
+      const ruleConfig = this.config.rules?.[r.id] as any;
+      if (ruleConfig) {
+        if (typeof ruleConfig === 'string') {
+          return ruleConfig !== 'off';
+        }
+        if (typeof ruleConfig === 'object') {
+          return ruleConfig.status !== 'off';
+        }
+      }
+      return true;
+    });
     
     // Parse the code to AST
     const ast = parse(content, {
@@ -119,16 +140,21 @@ export class Scanner {
     });
 
     // Run rules
-    for (const rule of enabledRules) {
+    for (const rule of targetRules) {
       const context: RuleContext = {
         filePath,
         report: (nodeOrPath, message, suggestedFix) => {
           const node = nodeOrPath && (nodeOrPath.node ? nodeOrPath.node : nodeOrPath);
           const loc = node ? node.loc : null;
           if (loc) {
+            let severity = rule.severity;
+            const ruleConfig = this.config.rules?.[rule.id] as any;
+            if (ruleConfig && typeof ruleConfig === 'object' && ruleConfig.severity) {
+              severity = ruleConfig.severity as any;
+            }
             fileFindings.push({
               ruleId: rule.id,
-              severity: rule.severity,
+              severity,
               message,
               filePath,
               startLine: loc.start.line,
@@ -140,9 +166,14 @@ export class Scanner {
           }
         },
         reportAt: (line, column, message, suggestedFix) => {
+          let severity = rule.severity;
+          const ruleConfig = this.config.rules?.[rule.id] as any;
+          if (ruleConfig && typeof ruleConfig === 'object' && ruleConfig.severity) {
+            severity = ruleConfig.severity as any;
+          }
           fileFindings.push({
             ruleId: rule.id,
-            severity: rule.severity,
+            severity,
             message,
             filePath,
             startLine: line,

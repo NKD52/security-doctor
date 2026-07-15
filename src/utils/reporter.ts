@@ -34,6 +34,11 @@ export function reportConsole(findings: Finding[], score: number): void {
       if (f.suggestedFix) {
         console.log(pc.green(`    👉 Suggested Fix: ${f.suggestedFix}`));
       }
+
+      if (process.env.GITHUB_ACTIONS === 'true') {
+        const annotationType = (f.severity === 'critical' || f.severity === 'high') ? 'error' : 'warning';
+        console.log(`::${annotationType} file=${f.filePath},line=${f.startLine},col=${f.startColumn},title=${f.ruleId}::${f.message}`);
+      }
     }
     console.log('');
   }

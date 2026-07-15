@@ -21,3 +21,21 @@ function hashPassword(password) {
 function setupSession(res) {
   res.cookie('sid', '123456');
 }
+
+// SEC007: SQL Injection
+function handleLogin(req, res) {
+  const email = req.query.email;
+  db.query("SELECT * FROM users WHERE email = " + email);
+}
+
+// SEC008: Command Injection
+function handleDeploy(req, res) {
+  const repo = req.body.repo;
+  exec("git clone " + repo);
+}
+
+// SEC009: Path Traversal
+function handleRead(req, res) {
+  const file = req.query.file;
+  fs.readFile(file, 'utf8', (err, data) => {});
+}

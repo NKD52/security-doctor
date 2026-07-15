@@ -2,8 +2,10 @@ import { Rule } from './types.js';
 
 export const sec005Crypto: Rule = {
   id: 'SEC005',
+  title: 'Strong Cryptography',
   severity: 'medium',
   description: 'Detects usage of weak or outdated cryptographic hash functions (MD5, SHA1).',
+  agentInstruction: 'Do not use weak/outdated hash algorithms (MD5, SHA1). Use SHA-256, SHA-512, or bcrypt/argon2.',
   createVisitor(context) {
     return {
       CallExpression(path) {

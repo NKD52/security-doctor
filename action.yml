@@ -1,0 +1,24 @@
+name: 'Security Doctor Scan'
+description: 'Statically scan TypeScript and JavaScript files for security vulnerabilities.'
+author: 'NKD52'
+inputs:
+  path:
+    description: 'Path to scan.'
+    required: false
+    default: '.'
+  fail-threshold:
+    description: 'Minimum health score threshold required to pass the build.'
+    required: false
+    default: '80'
+runs:
+  using: 'composite'
+  steps:
+    - name: Install dependencies
+      shell: bash
+      run: npm install
+    - name: Build Scanner
+      shell: bash
+      run: npm run build
+    - name: Run Scan
+      shell: bash
+      run: node dist/cli.js ${{ inputs.path }} --fail-threshold ${{ inputs.fail-threshold }}
