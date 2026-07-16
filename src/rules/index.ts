@@ -10,6 +10,7 @@ import { sec008CommandInjection } from './sec008_command_injection.js';
 import { sec009PathTraversal } from './sec009_path_traversal.js';
 import { sec010Xss } from './sec010_xss.js';
 import { sec011NoSql } from './sec011_nosql.js';
+import { sec012Storage } from './sec012_storage.js';
 
 export const rules: Rule[] = [
   sec001Secrets,
@@ -22,7 +23,8 @@ export const rules: Rule[] = [
   sec008CommandInjection,
   sec009PathTraversal,
   sec010Xss,
-  sec011NoSql
+  sec011NoSql,
+  sec012Storage
 ];
 
 export * from './types.js';
