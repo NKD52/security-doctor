@@ -23,8 +23,8 @@ export interface Config {
 
 export interface RuleContext {
   filePath: string;
-  report: (nodePath: any, message: string, suggestedFix?: string) => void;
-  reportAt: (line: number, column: number, message: string, suggestedFix?: string) => void;
+  report: (nodePath: any, message: string, suggestedFix?: string, severity?: Severity) => void;
+  reportAt: (line: number, column: number, message: string, suggestedFix?: string, severity?: Severity) => void;
   config?: Config;
 }
 

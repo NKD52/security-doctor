@@ -291,5 +291,36 @@ describe('Configuration Overrides', () => {
     expect(findingsLow[0].severity).toBe('low');
     expect(calculateScore(findingsLow)).toBe(99); // 100 - 1
   });
+
+  it('SEC012: Sensitive Data in Web Storage', () => {
+    const code = `
+      // Positive cases:
+      localStorage.setItem('token', response.data.token);
+      sessionStorage.setItem('apiKey', key);
+      localStorage.setItem('password', pwd);
+
+      // Negative cases:
+      localStorage.setItem('theme', 'dark');
+      localStorage.setItem('authorId', post.authorId);
+      localStorage.setItem('user', JSON.stringify(data.user));
+    `;
+    const scanner = new Scanner();
+    const findings = scanner.scanFile('test-storage.ts', code);
+
+    // Should have exactly 3 findings (token, apiKey, password)
+    expect(findings.length).toBe(3);
+
+    const tokenFinding = findings.find(f => f.message.includes('token'));
+    expect(tokenFinding).toBeDefined();
+    expect(tokenFinding!.severity).toBe('high');
+
+    const apiKeyFinding = findings.find(f => f.message.includes('apiKey'));
+    expect(apiKeyFinding).toBeDefined();
+    expect(apiKeyFinding!.severity).toBe('high');
+
+    const pwdFinding = findings.find(f => f.message.includes('password'));
+    expect(pwdFinding).toBeDefined();
+    expect(pwdFinding!.severity).toBe('critical');
+  });
 });
 
