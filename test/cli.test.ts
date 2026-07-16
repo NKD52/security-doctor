@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { reportConsole, reportJson } from '../src/utils/reporter.js';
 import { Finding } from '../src/rules/types.js';
 import { Scanner } from '../src/engine.js';
+import { calculateScore } from '../src/score.js';
 
 describe('CLI Console Reporter Formatting', () => {
   let logSpy: any;
@@ -22,7 +23,7 @@ describe('CLI Console Reporter Formatting', () => {
       ruleId: 'SEC001',
       severity: 'critical',
       message: 'Potential hardcoded secret found.',
-      filePath: 'test.ts',
+      filePath: '/absolute/path/test.ts',
       startLine: 10,
       startColumn: 5,
       endLine: 10,
@@ -32,7 +33,7 @@ describe('CLI Console Reporter Formatting', () => {
       ruleId: 'SEC006',
       severity: 'medium',
       message: 'Cookie created without httpOnly.',
-      filePath: 'test.ts',
+      filePath: '/absolute/path/test.ts',
       startLine: 12,
       startColumn: 8,
       endLine: 12,
@@ -42,76 +43,78 @@ describe('CLI Console Reporter Formatting', () => {
 
   it('should format output as plain text when isTTY is false', () => {
     process.stdout.isTTY = false;
-    reportConsole(mockFindings, 73);
+    const score = calculateScore(mockFindings); // 82
+    reportConsole(mockFindings, score);
 
     const loggedOutput = logSpy.mock.calls.map((c: any) => c[0]).join('\n');
     
     // Should NOT contain the ASCII gauge border box characters
     expect(loggedOutput).not.toContain('┌─');
-    expect(loggedOutput).not.toContain('🚨 TOP ISSUE:');
+    expect(loggedOutput).not.toContain('🚨 TOP ISSUE');
     
     // Should contain plain formatting
-    expect(loggedOutput).toContain('test.ts');
+    expect(loggedOutput).toContain('/absolute/path/test.ts');
     expect(loggedOutput).toContain('SEC001');
     expect(loggedOutput).toContain('SEC006');
     expect(loggedOutput).toContain('Health Score:');
-    expect(loggedOutput).toContain('73/100');
+    expect(loggedOutput).toContain('82/100');
   });
 
   it('should format output with ASCII gauge and Top Issue box when isTTY is true (non-verbose)', () => {
     process.stdout.isTTY = true;
-    reportConsole(mockFindings, 73, { verbose: false });
+    const score = calculateScore(mockFindings); // 82
+    reportConsole(mockFindings, score, { verbose: false, scannedFilesCount: 10 });
 
     const loggedOutput = logSpy.mock.calls.map((c: any) => c[0]).join('\n');
     
     // Should contain the ASCII gauge border box characters
     expect(loggedOutput).toContain('┌' + '─'.repeat(58) + '┐');
-    expect(loggedOutput).toContain('Health Score: [███████████████░░░░░] 73/100');
+    expect(loggedOutput).toContain('Health Score: [████████████████░░░░] 82/100');
     expect(loggedOutput).toContain('Fair');
     expect(loggedOutput).toContain('└' + '─'.repeat(58) + '┘');
 
-    // Should contain the vulnerable files list
-    expect(loggedOutput).toContain('Vulnerable files:');
-    expect(loggedOutput).toContain('test.ts');
+    // Should contain the metrics summary
+    expect(loggedOutput).toContain('Scanned 10 files · 2 issues found · 1 files affected');
 
-    // Should contain the Top Issue box
-    expect(loggedOutput).toContain('🚨 TOP ISSUE:');
+    // Should contain the Top Issue box with relative paths and impact delta
+    expect(loggedOutput).toContain('🚨 TOP ISSUE');
     expect(loggedOutput).toContain('SEC001');
-    expect(loggedOutput).toContain('(test.ts:10:5)');
-    expect(loggedOutput).toContain('Severity:');
     expect(loggedOutput).toContain('CRITICAL');
-    expect(loggedOutput).toContain('Message:  Potential hardcoded secret found.');
-    expect(loggedOutput).toContain('🛡️ Impact:');
-    expect(loggedOutput).toContain('Fixing this prevents accidental leakage of private API credentials');
+    expect(loggedOutput).toContain('test.ts:10:5');
+    expect(loggedOutput).toContain('📈 Impact: Fixing this raises your score to 97/100 (+15)');
 
     // Should contain the help tip
     expect(loggedOutput).toContain('💡 Tip: Found 2 total vulnerabilities. Use the --verbose flag to display the full list of findings.');
 
-    // Since non-verbose, it should NOT print the full findings list below (e.g. details of SEC006 shouldn't be printed)
+    // Since non-verbose, it should NOT print the full findings list below
+    expect(loggedOutput).not.toContain('All 2 findings:');
     expect(loggedOutput).not.toContain('SEC006: Cookie created without httpOnly.');
   });
 
   it('should format output with ASCII gauge and full list when isTTY is true and verbose is true', () => {
     process.stdout.isTTY = true;
-    reportConsole(mockFindings, 73, { verbose: true });
+    const score = calculateScore(mockFindings); // 82
+    reportConsole(mockFindings, score, { verbose: true, scannedFilesCount: 10 });
 
     const loggedOutput = logSpy.mock.calls.map((c: any) => c[0]).join('\n');
     
     // Should contain the ASCII gauge border box characters
     expect(loggedOutput).toContain('┌' + '─'.repeat(58) + '┐');
     
-    // Should contain vulnerable files
-    expect(loggedOutput).toContain('Vulnerable files:');
-    expect(loggedOutput).toContain('test.ts');
+    // Should contain metrics summary
+    expect(loggedOutput).toContain('Scanned 10 files · 2 issues found · 1 files affected');
 
     // Should contain the Top Issue box
-    expect(loggedOutput).toContain('🚨 TOP ISSUE:');
+    expect(loggedOutput).toContain('🚨 TOP ISSUE');
     
-    // Since verbose, it SHOULD print the full findings list below
-    expect(loggedOutput).toContain('Found 2 vulnerabilities:');
+    // Since verbose, it SHOULD print the full findings list below with relative paths
+    expect(loggedOutput).toContain('All 2 findings:');
     expect(loggedOutput).toContain('test.ts');
     expect(loggedOutput).toContain('SEC001');
     expect(loggedOutput).toContain('SEC006');
+
+    // Should contain closing improvement target score
+    expect(loggedOutput).toContain('You could improve to 100/100 by fixing all 2 issues.');
   });
 
   it('should track scanned files list in Scanner.scannedFiles', async () => {
