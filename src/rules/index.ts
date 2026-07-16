@@ -8,6 +8,8 @@ import { sec006Cookies } from './sec006_cookies.js';
 import { sec007SqlInjection } from './sec007_sql_injection.js';
 import { sec008CommandInjection } from './sec008_command_injection.js';
 import { sec009PathTraversal } from './sec009_path_traversal.js';
+import { sec010Xss } from './sec010_xss.js';
+import { sec011NoSql } from './sec011_nosql.js';
 
 export const rules: Rule[] = [
   sec001Secrets,
@@ -18,7 +20,9 @@ export const rules: Rule[] = [
   sec006Cookies,
   sec007SqlInjection,
   sec008CommandInjection,
-  sec009PathTraversal
+  sec009PathTraversal,
+  sec010Xss,
+  sec011NoSql
 ];
 
 export * from './types.js';
