@@ -167,13 +167,17 @@ describe('Security Rules AST Scanning', () => {
       res.cookie('auth', 'value', { httpOnly: true }); // missing secure
       res.cookie('simple', 'value'); // missing both (no options object)
       res.cookie('insecure', 'value', { httpOnly: true, secure: false }); // disabled secure
+      res.cookie('sid_bad', token, { httpOnly: true, secure: process.env.SOME_OTHER_VAR === 'yes' }); // invalid env check
       
       // Negative cases (Should NOT trigger findings)
       res.cookie('session', 'value', { httpOnly: true, secure: true }); // safe
       res.cookie('session2', 'value', { secure: true, httpOnly: true, maxAge: 900000 }); // safe with extra options
+      res.cookie('session_env1', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production' }); // safe env check
+      res.cookie('session_env2', token, { httpOnly: true, secure: process.env.NODE_ENV !== 'development' }); // safe env check
+      res.cookie('session_env3', token, { httpOnly: true, secure: 'production' === process.env.NODE_ENV }); // safe reversed env check
     `;
     const findings = scanner.scanFile('test.ts', code);
-    expect(findings.length).toBe(4);
+    expect(findings.length).toBe(5);
     findings.forEach(f => {
       expect(f.ruleId).toBe('SEC006');
       expect(f.severity).toBe('medium');
