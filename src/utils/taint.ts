@@ -44,16 +44,58 @@ export function isSourceNode(node: any): boolean {
   return false;
 }
 
-export function expressionContainsTaint(node: any, taintedVars: Set<string>): boolean {
+function getMemberExpressionName(node: any): string | null {
+  if (!node) return null;
+  if (node.type === 'Identifier') return node.name;
+  if (node.type === 'MemberExpression') {
+    const obj = getMemberExpressionName(node.object);
+    const prop = node.property.type === 'Identifier' ? node.property.name : null;
+    if (obj && prop) return `${obj}.${prop}`;
+  }
+  return null;
+}
+
+export function expressionContainsTaint(
+  node: any,
+  taintedVars: Set<string>,
+  customSanitizers: string[] = []
+): boolean {
   if (!node) return false;
 
   // Short-circuit if it's a recognized sanitizer, otherwise propagate taint from arguments
   if (node.type === 'CallExpression') {
     const callee = node.callee;
-    if (callee.type === 'Identifier' && SANITIZERS.includes(callee.name)) {
-      return false;
+    const allSanitizers = [...SANITIZERS, ...customSanitizers];
+
+    if (callee.type === 'Identifier') {
+      if (allSanitizers.includes(callee.name)) {
+        return false;
+      }
+      const nameLower = callee.name.toLowerCase();
+      if (nameLower.includes('escape') || nameLower.includes('sanitize')) {
+        return false;
+      }
     }
-    return node.arguments.some((arg: any) => expressionContainsTaint(arg, taintedVars));
+
+    if (callee.type === 'MemberExpression') {
+      const propName = callee.property.type === 'Identifier' ? callee.property.name : '';
+      if (propName) {
+        if (allSanitizers.includes(propName)) {
+          return false;
+        }
+        const propLower = propName.toLowerCase();
+        if (propLower.includes('escape') || propLower.includes('sanitize')) {
+          return false;
+        }
+      }
+
+      const fullName = getMemberExpressionName(callee);
+      if (fullName && allSanitizers.includes(fullName)) {
+        return false;
+      }
+    }
+
+    return node.arguments.some((arg: any) => expressionContainsTaint(arg, taintedVars, customSanitizers));
   }
 
   if (node.type === 'Identifier') {
@@ -62,17 +104,17 @@ export function expressionContainsTaint(node: any, taintedVars: Set<string>): bo
 
   if (node.type === 'BinaryExpression') {
     return (
-      expressionContainsTaint(node.left, taintedVars) ||
-      expressionContainsTaint(node.right, taintedVars)
+      expressionContainsTaint(node.left, taintedVars, customSanitizers) ||
+      expressionContainsTaint(node.right, taintedVars, customSanitizers)
     );
   }
 
   if (node.type === 'TemplateLiteral') {
-    return node.expressions.some((expr: any) => expressionContainsTaint(expr, taintedVars));
+    return node.expressions.some((expr: any) => expressionContainsTaint(expr, taintedVars, customSanitizers));
   }
 
   if (node.type === 'MemberExpression') {
-    return expressionContainsTaint(node.object, taintedVars);
+    return expressionContainsTaint(node.object, taintedVars, customSanitizers);
   }
 
   return false;
