@@ -1,5 +1,7 @@
 import pc from 'picocolors';
+import * as path from 'path';
 import { Finding } from '../rules/types.js';
+import { calculateScore } from '../score.js';
 
 function getImprovementMessage(ruleId: string): string {
   switch (ruleId) {
@@ -30,7 +32,17 @@ function getImprovementMessage(ruleId: string): string {
   }
 }
 
-export function reportConsole(findings: Finding[], score: number, opts: { verbose?: boolean } = {}): void {
+function getDeduction(severity: string): number {
+  switch (severity) {
+    case 'critical': return 15;
+    case 'high': return 8;
+    case 'medium': return 3;
+    case 'low': return 1;
+    default: return 0;
+  }
+}
+
+export function reportConsole(findings: Finding[], score: number, opts: { verbose?: boolean; scannedFilesCount?: number } = {}): void {
   if (findings.length === 0) {
     console.log(pc.green('\n✔ No security vulnerabilities found!'));
     console.log(`${pc.bold('Health Score:')} ${pc.green(`${score}/100`)}\n`);
@@ -69,9 +81,27 @@ export function reportConsole(findings: Finding[], score: number, opts: { verbos
     console.log(coloredLine);
     console.log('└' + '─'.repeat(totalBoxWidth - 2) + '┘\n');
 
-    // List vulnerable files
-    const uniqueFiles = [...new Set(findings.map(f => f.filePath))];
-    console.log(pc.bold('Vulnerable files: ') + pc.cyan(uniqueFiles.join(', ')) + '\n');
+    // Scanned files metrics summary
+    const filesAffectedCount = new Set(findings.map(f => f.filePath)).size;
+    console.log(pc.gray(`Scanned ${opts.scannedFilesCount || 0} files · ${findings.length} issues found · ${filesAffectedCount} files affected`));
+
+    // Category/severity counts compact one-line summary
+    const critical = findings.filter(f => f.severity === 'critical').length;
+    const high = findings.filter(f => f.severity === 'high').length;
+    const medium = findings.filter(f => f.severity === 'medium').length;
+    const low = findings.filter(f => f.severity === 'low').length;
+
+    const severityParts: string[] = [];
+    if (critical > 0) severityParts.push(`${critical} critical`);
+    if (high > 0) severityParts.push(`${high} high`);
+    if (medium > 0) severityParts.push(`${medium} medium`);
+    if (low > 0) severityParts.push(`${low} low`);
+
+    const severitySummary = severityParts.length > 0 ? `Security > ${severityParts.join(', ')}` : '';
+    if (severitySummary) {
+      console.log(pc.gray(severitySummary));
+    }
+    console.log(''); // Blank line before Top Issue
 
     // SURFACING TOP ISSUE
     const severityWeights: Record<string, number> = {
@@ -94,34 +124,71 @@ export function reportConsole(findings: Finding[], score: number, opts: { verbos
       topIssue.severity === 'medium' ? pc.magenta :
       pc.blue;
 
-    console.log(pc.bold(pc.red('🚨 TOP ISSUE:')));
-    console.log(`  ${pc.bold(topIssue.ruleId)} (${topIssue.filePath}:${topIssue.startLine}:${topIssue.startColumn})`);
-    console.log(`  Severity: ${topSevColor(topIssue.severity.toUpperCase())}`);
-    console.log(`  Message:  ${topIssue.message}`);
+    const remainingFindings = findings.filter(f => f !== topIssue);
+    const newScore = calculateScore(remainingFindings);
+    const delta = newScore - score;
+    const topIssueRelPath = path.relative(process.cwd(), topIssue.filePath).replace(/\\/g, '/');
+
+    console.log(pc.bold(pc.red('🚨 TOP ISSUE')));
+    console.log(`  ${pc.bold(topIssue.ruleId)} · ${topIssue.severity.toUpperCase()} · ${topIssueRelPath}:${topIssue.startLine}:${topIssue.startColumn}`);
+    console.log(`  ${topIssue.message}`);
     if (topIssue.suggestedFix) {
-      console.log(pc.green(`  👉 Fix:    ${topIssue.suggestedFix}`));
+      console.log(pc.green(`  👉 Fix: ${topIssue.suggestedFix}`));
     }
-    console.log(pc.cyan(`  🛡️ Impact:  ${getImprovementMessage(topIssue.ruleId)}`));
-    console.log('\n' + pc.gray('─'.repeat(totalBoxWidth)) + '\n');
+    console.log(pc.cyan(`  📈 Impact: Fixing this raises your score to ${newScore}/100 (+${delta})`));
+    console.log('\n' + pc.gray('─'.repeat(totalBoxWidth)));
 
     // If not verbose, skip printing full list details and print help tip
     if (!isVerbose) {
-      console.log(pc.gray(`💡 Tip: Found ${findings.length} total vulnerabilities. Use the --verbose flag to display the full list of findings.\n`));
-      
-      const scoreColor = 
-        score >= 90 ? pc.green :
-        score >= 70 ? pc.yellow :
-        pc.red;
-
-      console.log(`${pc.bold('Health Score:')} ${scoreColor(`${score}/100`)}`);
-      if (score < 100) {
-        console.log(pc.gray(`Deductions based on severity levels: Critical (-15), High (-8), Medium (-3), Low (-1)`));
-      }
-      console.log('');
+      console.log('\n' + pc.gray(`💡 Tip: Found ${findings.length} total vulnerabilities. Use the --verbose flag to display the full list of findings.`));
       return;
     }
+
+    // Verbose Output
+    console.log('\n' + pc.bold(`All ${findings.length} findings:\n`));
+
+    // Group by file
+    const grouped: Record<string, Finding[]> = {};
+    for (const f of findings) {
+      if (!grouped[f.filePath]) {
+        grouped[f.filePath] = [];
+      }
+      grouped[f.filePath].push(f);
+    }
+
+    for (const [filePath, fileFindings] of Object.entries(grouped)) {
+      const relPath = path.relative(process.cwd(), filePath).replace(/\\/g, '/');
+      console.log(pc.underline(pc.cyan(relPath)));
+      for (const f of fileFindings) {
+        const sevColor = 
+          f.severity === 'critical' ? pc.red :
+          f.severity === 'high' ? pc.yellow :
+          f.severity === 'medium' ? pc.magenta :
+          pc.blue;
+          
+        const badge = sevColor(`[${f.severity.toUpperCase()}]`);
+        const loc = pc.gray(`${f.startLine}:${f.startColumn}`);
+        console.log(`  ${loc}  ${badge} ${pc.bold(f.ruleId)}: ${f.message}`);
+        if (f.suggestedFix) {
+          console.log(pc.green(`    👉 ${f.suggestedFix}`));
+        }
+
+        if (process.env.GITHUB_ACTIONS === 'true') {
+          const annotationType = (f.severity === 'critical' || f.severity === 'high') ? 'error' : 'warning';
+          console.log(`::${annotationType} file=${f.filePath},line=${f.startLine},col=${f.startColumn},title=${f.ruleId}::${f.message}`);
+        }
+      }
+      console.log('');
+    }
+
+    const totalDeduction = findings.reduce((sum, f) => sum + getDeduction(f.severity), 0);
+    const maxPossibleScore = Math.min(100, score + totalDeduction);
+    console.log(`You could improve to ${maxPossibleScore}/100 by fixing all ${findings.length} issues.`);
+    console.log(pc.gray('─'.repeat(totalBoxWidth)));
+    return;
   }
 
+  // Non-interactive Mode (plain output)
   console.log(pc.bold(`Found ${findings.length} vulnerabilities:\n`));
 
   // Group by file
@@ -146,7 +213,7 @@ export function reportConsole(findings: Finding[], score: number, opts: { verbos
       const loc = pc.gray(`${f.startLine}:${f.startColumn}`);
       console.log(`  ${loc}  ${badge} ${pc.bold(f.ruleId)}: ${f.message}`);
       if (f.suggestedFix) {
-        console.log(pc.green(`    👉 Suggested Fix: ${f.suggestedFix}`));
+        console.log(pc.green(`    👉 ${f.suggestedFix}`));
       }
 
       if (process.env.GITHUB_ACTIONS === 'true') {
