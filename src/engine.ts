@@ -143,11 +143,11 @@ export class Scanner {
     for (const rule of targetRules) {
       const context: RuleContext = {
         filePath,
-        report: (nodeOrPath, message, suggestedFix) => {
+        report: (nodeOrPath, message, suggestedFix, customSeverity) => {
           const node = nodeOrPath && (nodeOrPath.node ? nodeOrPath.node : nodeOrPath);
           const loc = node ? node.loc : null;
           if (loc) {
-            let severity = rule.severity;
+            let severity = customSeverity || rule.severity;
             const ruleConfig = this.config.rules?.[rule.id] as any;
             if (ruleConfig && typeof ruleConfig === 'object' && ruleConfig.severity) {
               severity = ruleConfig.severity as any;
@@ -165,8 +165,8 @@ export class Scanner {
             });
           }
         },
-        reportAt: (line, column, message, suggestedFix) => {
-          let severity = rule.severity;
+        reportAt: (line, column, message, suggestedFix, customSeverity) => {
+          let severity = customSeverity || rule.severity;
           const ruleConfig = this.config.rules?.[rule.id] as any;
           if (ruleConfig && typeof ruleConfig === 'object' && ruleConfig.severity) {
             severity = ruleConfig.severity as any;
