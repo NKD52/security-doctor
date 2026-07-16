@@ -298,19 +298,23 @@ describe('Configuration Overrides', () => {
       localStorage.setItem('token', response.data.token);
       sessionStorage.setItem('apiKey', key);
       localStorage.setItem('password', pwd);
+      sessionStorage.setItem("ligma:token", token);
+      window.sessionStorage.setItem("ligma:token", token);
+      window.localStorage.setItem("authToken", token);
 
       // Negative cases:
       localStorage.setItem('theme', 'dark');
       localStorage.setItem('authorId', post.authorId);
       localStorage.setItem('user', JSON.stringify(data.user));
+      window.localStorage.setItem("app:theme", "dark");
     `;
     const scanner = new Scanner();
     const findings = scanner.scanFile('test-storage.ts', code);
 
-    // Should have exactly 3 findings (token, apiKey, password)
-    expect(findings.length).toBe(3);
+    // Should have exactly 6 findings
+    expect(findings.length).toBe(6);
 
-    const tokenFinding = findings.find(f => f.message.includes('token'));
+    const tokenFinding = findings.find(f => f.message.includes('token') && !f.message.includes('ligma'));
     expect(tokenFinding).toBeDefined();
     expect(tokenFinding!.severity).toBe('high');
 
@@ -321,6 +325,15 @@ describe('Configuration Overrides', () => {
     const pwdFinding = findings.find(f => f.message.includes('password'));
     expect(pwdFinding).toBeDefined();
     expect(pwdFinding!.severity).toBe('critical');
+
+    // Verify colon-delimited and prefixed findings are flagged correctly
+    const ligmaFindings = findings.filter(f => f.message.includes('ligma:token'));
+    expect(ligmaFindings.length).toBe(2);
+    expect(ligmaFindings.every(f => f.severity === 'high')).toBe(true);
+
+    const authFinding = findings.find(f => f.message.includes('authToken'));
+    expect(authFinding).toBeDefined();
+    expect(authFinding!.severity).toBe('high');
   });
 });
 
