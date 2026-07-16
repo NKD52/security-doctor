@@ -293,6 +293,7 @@ program
           all: !!options.all
         });
         if (process.stdout.isTTY && process.env.GITHUB_ACTIONS !== 'true') {
+          await new Promise(resolve => setTimeout(resolve, 200));
           await runActionMenu(findings, score, scanner.scannedFiles.length);
         }
       }

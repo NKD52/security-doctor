@@ -43,6 +43,8 @@ function getDeduction(severity: string): number {
   }
 }
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 function pause(message: string): Promise<void> {
   const rl = readline.createInterface({
     input: process.stdin,
@@ -171,10 +173,12 @@ export async function reportConsole(
     console.log('\n┌' + '─'.repeat(totalBoxWidth - 2) + '┐');
     console.log(coloredLine);
     console.log('└' + '─'.repeat(totalBoxWidth - 2) + '┘\n');
+    await sleep(200);
 
     // Scanned files metrics summary
     const filesAffectedCount = new Set(findings.map(f => f.filePath)).size;
     console.log(pc.gray(`Scanned ${opts.scannedFilesCount || 0} files · ${findings.length} issues found · ${filesAffectedCount} files affected`));
+    await sleep(200);
 
     // Category/severity counts compact one-line summary
     const critical = findings.filter(f => f.severity === 'critical').length;
@@ -192,6 +196,7 @@ export async function reportConsole(
     if (severitySummary) {
       console.log(pc.gray(severitySummary));
     }
+    await sleep(200);
     console.log(''); // Blank line before Top Issue
 
     // SURFACING TOP ISSUE
@@ -229,6 +234,7 @@ export async function reportConsole(
     }
     console.log(pc.cyan(`  📈 Impact: Fixing this raises your score to ${newScore}/100 (+${delta})`));
     console.log('\n' + pc.gray('─'.repeat(totalBoxWidth)));
+    await sleep(200);
 
     // If not verbose, skip printing full list details and print help tip
     if (!isVerbose) {
