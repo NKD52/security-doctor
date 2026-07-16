@@ -17,6 +17,7 @@
   "dependencies": {
     "@babel/parser": "^7.25.0",
     "@babel/traverse": "^7.25.0",
+    "clipboardy": "^5.3.1",
     "commander": "^12.1.0",
     "fast-glob": "^3.3.2",
     "picocolors": "^1.1.0"
