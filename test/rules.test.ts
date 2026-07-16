@@ -32,6 +32,8 @@ describe('Security Rules AST Scanning', () => {
         slackSecret: "slack_tok_val_shannon_entropy_test_passed_abc_123_xyz"
       };
       db_password = "sUp3r_SeCr3t_P@ss_123_!";
+      const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_value_here_abc123xyz';
+      const apiKeyFallback = process.env.API_KEY ?? 'sk_live_abc123xyz';
 
       // Negative cases (Should NOT trigger findings)
       const normalString = "hello world";
@@ -41,13 +43,24 @@ describe('Security Rules AST Scanning', () => {
       const password = "dummy_pwd"; // Ignored due to placeholder string
       const token = "TODO_insert_token"; // Ignored due to placeholder string
       const db_password_short = "123"; // Too short
+      const timeout = process.env.TIMEOUT || 3000;
+      const mode = process.env.NODE_ENV || 'development';
+      const auth = process.env.AUTH || \`Bearer \${token}\`;
     `;
     const findings = scanner.scanFile('test.ts', code);
-    expect(findings.length).toBe(3);
+    expect(findings.length).toBe(5);
     findings.forEach(f => {
       expect(f.ruleId).toBe('SEC001');
       expect(f.severity).toBe('critical');
     });
+
+    const jwtFinding = findings.find(f => f.message.includes('fallback for "JWT_SECRET"'));
+    expect(jwtFinding).toBeDefined();
+    expect(jwtFinding!.message).toBe('Possible hardcoded credential used as a fallback for "JWT_SECRET". If the environment variable is unset, the app silently runs with this committed value instead of failing.');
+    expect(jwtFinding!.suggestedFix).toBe("Throw an error if the environment variable is missing (fail closed): throw new Error('JWT_SECRET must be set')");
+
+    const apiKeyFinding = findings.find(f => f.message.includes('fallback for "apiKeyFallback"'));
+    expect(apiKeyFinding).toBeDefined();
   });
 
   it('SEC002: Eval/Exec usage', () => {

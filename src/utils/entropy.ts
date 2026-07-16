@@ -51,7 +51,6 @@ export function isLikelySecret(
     'insert-',
     'fake_',
     'fake-',
-    'secret_value',
     'key_here',
     'token_here'
   ];
