@@ -83,7 +83,25 @@ export function reportConsole(findings: Finding[], score: number, opts: { verbos
 
     // Scanned files metrics summary
     const filesAffectedCount = new Set(findings.map(f => f.filePath)).size;
-    console.log(pc.gray(`Scanned ${opts.scannedFilesCount || 0} files · ${findings.length} issues found · ${filesAffectedCount} files affected\n`));
+    console.log(pc.gray(`Scanned ${opts.scannedFilesCount || 0} files · ${findings.length} issues found · ${filesAffectedCount} files affected`));
+
+    // Category/severity counts compact one-line summary
+    const critical = findings.filter(f => f.severity === 'critical').length;
+    const high = findings.filter(f => f.severity === 'high').length;
+    const medium = findings.filter(f => f.severity === 'medium').length;
+    const low = findings.filter(f => f.severity === 'low').length;
+
+    const severityParts: string[] = [];
+    if (critical > 0) severityParts.push(`${critical} critical`);
+    if (high > 0) severityParts.push(`${high} high`);
+    if (medium > 0) severityParts.push(`${medium} medium`);
+    if (low > 0) severityParts.push(`${low} low`);
+
+    const severitySummary = severityParts.length > 0 ? `Security > ${severityParts.join(', ')}` : '';
+    if (severitySummary) {
+      console.log(pc.gray(severitySummary));
+    }
+    console.log(''); // Blank line before Top Issue
 
     // SURFACING TOP ISSUE
     const severityWeights: Record<string, number> = {
@@ -118,16 +136,16 @@ export function reportConsole(findings: Finding[], score: number, opts: { verbos
       console.log(pc.green(`  👉 Fix: ${topIssue.suggestedFix}`));
     }
     console.log(pc.cyan(`  📈 Impact: Fixing this raises your score to ${newScore}/100 (+${delta})`));
-    console.log('\n' + pc.gray('─'.repeat(totalBoxWidth)) + '\n');
+    console.log('\n' + pc.gray('─'.repeat(totalBoxWidth)));
 
     // If not verbose, skip printing full list details and print help tip
     if (!isVerbose) {
-      console.log(pc.gray(`💡 Tip: Found ${findings.length} total vulnerabilities. Use the --verbose flag to display the full list of findings.\n`));
+      console.log('\n' + pc.gray(`💡 Tip: Found ${findings.length} total vulnerabilities. Use the --verbose flag to display the full list of findings.`));
       return;
     }
 
     // Verbose Output
-    console.log(pc.bold(`All ${findings.length} findings:\n`));
+    console.log('\n' + pc.bold(`All ${findings.length} findings:\n`));
 
     // Group by file
     const grouped: Record<string, Finding[]> = {};
@@ -152,7 +170,7 @@ export function reportConsole(findings: Finding[], score: number, opts: { verbos
         const loc = pc.gray(`${f.startLine}:${f.startColumn}`);
         console.log(`  ${loc}  ${badge} ${pc.bold(f.ruleId)}: ${f.message}`);
         if (f.suggestedFix) {
-          console.log(pc.green(`    👉 Suggested Fix: ${f.suggestedFix}`));
+          console.log(pc.green(`    👉 ${f.suggestedFix}`));
         }
 
         if (process.env.GITHUB_ACTIONS === 'true') {
@@ -166,7 +184,7 @@ export function reportConsole(findings: Finding[], score: number, opts: { verbos
     const totalDeduction = findings.reduce((sum, f) => sum + getDeduction(f.severity), 0);
     const maxPossibleScore = Math.min(100, score + totalDeduction);
     console.log(`You could improve to ${maxPossibleScore}/100 by fixing all ${findings.length} issues.`);
-    console.log(pc.gray('─'.repeat(totalBoxWidth)) + '\n');
+    console.log(pc.gray('─'.repeat(totalBoxWidth)));
     return;
   }
 
@@ -195,7 +213,7 @@ export function reportConsole(findings: Finding[], score: number, opts: { verbos
       const loc = pc.gray(`${f.startLine}:${f.startColumn}`);
       console.log(`  ${loc}  ${badge} ${pc.bold(f.ruleId)}: ${f.message}`);
       if (f.suggestedFix) {
-        console.log(pc.green(`    👉 Suggested Fix: ${f.suggestedFix}`));
+        console.log(pc.green(`    👉 ${f.suggestedFix}`));
       }
 
       if (process.env.GITHUB_ACTIONS === 'true') {
