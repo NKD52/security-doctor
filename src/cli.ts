@@ -10,6 +10,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
 import pc from 'picocolors';
+import { execSync } from 'child_process';
+import clipboardy from 'clipboardy';
 
 const WORKFLOW_TEMPLATE = `name: Security Doctor Scan
 
@@ -43,41 +45,44 @@ function askQuestion(query: string): Promise<string> {
   });
 }
 
-async function runActionMenu(findings: any[], score: number, scannedFilesCount: number) {
-  if (findings.length === 0) return;
+function getBaseBranch(): string | null {
+  try {
+    execSync('git rev-parse --is-inside-work-tree', { stdio: 'ignore' });
+  } catch {
+    return null;
+  }
 
-  console.log('What\'s next?');
-  console.log('  [1] Fix this now with an AI coding agent');
-  console.log('  [2] Copy a fix prompt for the top issue to clipboard');
-  console.log('  [3] Install these rules as a coding-agent skill');
-  console.log('  [4] Add automated scanning to GitHub Actions');
-  console.log('  [5] Nothing, exit\n');
+  for (const ref of ['main', 'master', 'origin/main', 'origin/master']) {
+    try {
+      execSync(`git rev-parse --verify ${ref}`, { stdio: 'ignore' });
+      return ref;
+    } catch {}
+  }
+  return null;
+}
 
-  const answer = await askQuestion('> ');
-  const choice = answer.trim();
+function getCurrentBranch(): string {
+  try {
+    return execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf8' }).trim();
+  } catch {
+    return 'HEAD';
+  }
+}
 
-  if (choice === '1') {
-    console.log(pc.bold('\n---------------- 📋 AI AGENT HANDOFF PROMPT ----------------'));
-    console.log('Please fix the following security vulnerabilities in the codebase:\n');
-    const grouped: Record<string, any[]> = {};
-    for (const f of findings) {
-      const relPath = path.relative(process.cwd(), f.filePath).replace(/\\/g, '/');
-      if (!grouped[relPath]) grouped[relPath] = [];
-      grouped[relPath].push(f);
-    }
-    for (const [relPath, fileFindings] of Object.entries(grouped)) {
-      console.log(`File: ${relPath}`);
-      for (const f of fileFindings) {
-        console.log(`- ${f.ruleId} (${f.severity.toUpperCase()}): ${f.message}`);
-        if (f.suggestedFix) {
-          console.log(`  Suggested Fix: ${f.suggestedFix}`);
-        }
-      }
-      console.log('');
-    }
-    console.log('------------------------------------------------------------');
-    console.log('Copy the prompt above and paste it into your AI coding agent.\n');
-  } else if (choice === '2') {
+function getChangedFilesCount(base: string): number {
+  try {
+    const output = execSync(`git diff --name-only ${base}`, { encoding: 'utf8' });
+    return output.trim().split(/\r?\n/).filter(line => line.length > 0).length;
+  } catch {
+    return 0;
+  }
+}
+
+function generateFixPrompt(findings: any[], topIssueOnly: boolean = false): string {
+  if (findings.length === 0) return '';
+  const grouped: Record<string, any[]> = {};
+  
+  if (topIssueOnly) {
     const severityWeights: Record<string, number> = {
       critical: 4,
       high: 3,
@@ -91,31 +96,95 @@ async function runActionMenu(findings: any[], score: number, scannedFilesCount: 
       }
     }
     const relPath = path.relative(process.cwd(), topIssue.filePath).replace(/\\/g, '/');
-    console.log(pc.bold('\n---------------- 📋 TOP ISSUE FIX PROMPT ----------------'));
-    console.log(`Fix the following security issue in ${relPath}:`);
-    console.log(`- ${topIssue.ruleId} (${topIssue.severity.toUpperCase()}): ${topIssue.message}`);
+    let prompt = `Fix the following security issue in ${relPath}:\n`;
+    prompt += `- ${topIssue.ruleId} (${topIssue.severity.toUpperCase()}): ${topIssue.message}\n`;
     if (topIssue.suggestedFix) {
-      console.log(`  Suggested Fix: ${topIssue.suggestedFix}`);
+      prompt += `  👉 Fix: ${topIssue.suggestedFix}\n`;
     }
-    console.log('---------------------------------------------------------');
-    console.log('Copy the prompt above and paste it into your AI coding agent.\n');
-  } else if (choice === '3') {
-    installAgentInstructions(process.cwd());
-  } else if (choice === '4') {
-    const workflowDir = path.resolve(process.cwd(), '.github/workflows');
-    const workflowPath = path.resolve(workflowDir, 'security-doctor.yml');
-    try {
-      if (!fs.existsSync(workflowDir)) {
-        fs.mkdirSync(workflowDir, { recursive: true });
-      }
-      fs.writeFileSync(workflowPath, WORKFLOW_TEMPLATE, 'utf8');
-      console.log(pc.green(`\n✔ Configured GitHub Action successfully!`));
-      console.log(pc.gray(`Created workflow configuration at: `) + pc.cyan('.github/workflows/security-doctor.yml\n'));
-    } catch (err) {
-      console.error(pc.red(`\nFailed to configure GitHub Action: ${(err as Error).message}\n`));
-    }
+    return prompt.trim();
   } else {
-    // Option 5 or invalid choice, exit cleanly
+    let prompt = 'Please fix the following security vulnerabilities in the codebase:\n\n';
+    for (const f of findings) {
+      const relPath = path.relative(process.cwd(), f.filePath).replace(/\\/g, '/');
+      if (!grouped[relPath]) grouped[relPath] = [];
+      grouped[relPath].push(f);
+    }
+    for (const [relPath, fileFindings] of Object.entries(grouped)) {
+      prompt += `File: ${relPath}\n`;
+      for (const f of fileFindings) {
+        prompt += `- ${f.ruleId} (${f.severity.toUpperCase()}): ${f.message}\n`;
+        if (f.suggestedFix) {
+          prompt += `  👉 Fix: ${f.suggestedFix}\n`;
+        }
+      }
+      prompt += '\n';
+    }
+    return prompt.trim();
+  }
+}
+
+function copyToClipboard(text: string, label: string) {
+  try {
+    clipboardy.writeSync(text);
+    console.log(pc.green('\n✔ Copied to your clipboard.'));
+  } catch (err) {
+    console.log(pc.yellow('\n⚠ Clipboard unavailable — prompt printed below instead:\n'));
+    console.log(pc.bold(`---------------- 📋 ${label.toUpperCase()} ----------------`));
+    console.log(text);
+    console.log('------------------------------------------------------------');
+  }
+}
+
+async function runActionMenu(findings: any[], score: number, scannedFilesCount: number, verbose: boolean) {
+  if (findings.length === 0) return;
+
+  while (true) {
+    console.log(''); // full blank line before menu
+    console.log('What\'s next?');
+    console.log('  [1] Fix this now with an AI coding agent');
+    if (verbose) {
+      console.log(`  [2] Copy a fix prompt for all ${findings.length} findings to clipboard`);
+    } else {
+      console.log('  [2] Copy a fix prompt for the top issue to clipboard');
+    }
+    console.log('  [3] Install these rules as a coding-agent skill');
+    console.log('  [4] Add automated scanning to GitHub Actions');
+    console.log('  [5] Nothing, exit\n');
+
+    const answer = await askQuestion('> ');
+    const choice = answer.trim();
+
+    if (choice === '1') {
+      const prompt = generateFixPrompt(findings, false);
+      copyToClipboard(prompt, 'AI Agent Handoff Prompt');
+    } else if (choice === '2') {
+      if (verbose) {
+        const prompt = generateFixPrompt(findings, false);
+        copyToClipboard(prompt, 'All Findings Fix Prompt');
+      } else {
+        const prompt = generateFixPrompt(findings, true);
+        copyToClipboard(prompt, 'Top Issue Fix Prompt');
+      }
+    } else if (choice === '3') {
+      installAgentInstructions(process.cwd());
+    } else if (choice === '4') {
+      const workflowDir = path.resolve(process.cwd(), '.github/workflows');
+      const workflowPath = path.resolve(workflowDir, 'security-doctor.yml');
+      try {
+        if (!fs.existsSync(workflowDir)) {
+          fs.mkdirSync(workflowDir, { recursive: true });
+        }
+        fs.writeFileSync(workflowPath, WORKFLOW_TEMPLATE, 'utf8');
+        console.log(pc.green(`\n✔ Configured GitHub Action successfully!`));
+        console.log(pc.gray(`Created workflow configuration at: `) + pc.cyan('.github/workflows/security-doctor.yml'));
+      } catch (err) {
+        console.error(pc.red(`\nFailed to configure GitHub Action: ${(err as Error).message}`));
+      }
+    } else if (choice === '5' || choice === '') {
+      break;
+    } else {
+      break;
+    }
   }
 }
 
@@ -143,6 +212,22 @@ program
 
       if (options.diff) {
         diffLines = getChangedLines(options.diff, process.cwd());
+      } else if (process.stdout.isTTY && !options.json && process.env.GITHUB_ACTIONS !== 'true') {
+        const baseBranch = getBaseBranch();
+        if (baseBranch) {
+          const currentBranch = getCurrentBranch();
+          const changedCount = getChangedFilesCount(baseBranch);
+          
+          console.log('? Choose what to scan');
+          console.log('  [1] Full codebase');
+          console.log(`  [2] Changed files on ${currentBranch} vs ${baseBranch} (${changedCount} files)\n`);
+          
+          const answer = await askQuestion('> ');
+          if (answer.trim() === '2') {
+            diffLines = getChangedLines(baseBranch, process.cwd());
+          }
+          console.log('');
+        }
       }
 
       const scanner = new Scanner({
@@ -178,7 +263,7 @@ program
           scannedFilesCount: scanner.scannedFiles.length
         });
         if (process.stdout.isTTY && process.env.GITHUB_ACTIONS !== 'true') {
-          await runActionMenu(findings, score, scanner.scannedFiles.length);
+          await runActionMenu(findings, score, scanner.scannedFiles.length, !!options.verbose);
         }
       }
 
