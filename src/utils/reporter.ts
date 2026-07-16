@@ -8,7 +8,68 @@ export function reportConsole(findings: Finding[], score: number): void {
     return;
   }
 
-  console.log(pc.bold(`\nFound ${findings.length} vulnerabilities:\n`));
+  // Check if we are running in an interactive terminal (TTY)
+  if (process.stdout.isTTY) {
+    const barLength = 20;
+    const filledCount = Math.round((score / 100) * barLength);
+    const emptyCount = barLength - filledCount;
+    const bar = '█'.repeat(filledCount) + '░'.repeat(emptyCount);
+    
+    let label = 'Good';
+    let labelColor = pc.green;
+    if (score < 50) {
+      label = 'Critical';
+      labelColor = pc.red;
+    } else if (score < 70) {
+      label = 'Poor';
+      labelColor = pc.red;
+    } else if (score < 90) {
+      label = 'Fair';
+      labelColor = pc.yellow;
+    }
+
+    const scoreText = `${score}/100`;
+    const rawLine = `  Health Score: [${bar}] ${scoreText} (${label})`;
+    const totalBoxWidth = 60;
+    const paddingNeeded = totalBoxWidth - rawLine.length - 4; // 4 for '│ ' and ' │'
+    const coloredLine = `│  Health Score: [${bar}] ${scoreText} (${labelColor(label)})` + ' '.repeat(Math.max(0, paddingNeeded)) + '│';
+
+    console.log('\n┌' + '─'.repeat(totalBoxWidth - 2) + '┐');
+    console.log(coloredLine);
+    console.log('└' + '─'.repeat(totalBoxWidth - 2) + '┘\n');
+
+    // SURFACING TOP ISSUE
+    const severityWeights: Record<string, number> = {
+      critical: 4,
+      high: 3,
+      medium: 2,
+      low: 1
+    };
+
+    let topIssue = findings[0];
+    for (const f of findings) {
+      if (severityWeights[f.severity] > severityWeights[topIssue.severity]) {
+        topIssue = f;
+      }
+    }
+
+    const topSevColor = 
+      topIssue.severity === 'critical' ? pc.red :
+      topIssue.severity === 'high' ? pc.yellow :
+      topIssue.severity === 'medium' ? pc.magenta :
+      pc.blue;
+
+    console.log(pc.bold(pc.red('🚨 TOP ISSUE:')));
+    console.log(`  ${pc.bold(topIssue.ruleId)} (${topIssue.filePath}:${topIssue.startLine}:${topIssue.startColumn})`);
+    console.log(`  Severity: ${topSevColor(topIssue.severity.toUpperCase())}`);
+    console.log(`  Message:  ${topIssue.message}`);
+    if (topIssue.suggestedFix) {
+      console.log(pc.green(`  👉 Fix:    ${topIssue.suggestedFix}`));
+    }
+    console.log('\n' + pc.gray('─'.repeat(totalBoxWidth)) + '\n');
+  }
+
+  console.log(pc.bold(`Found ${findings.length} vulnerabilities:\n`));
 
   // Group by file
   const grouped: Record<string, Finding[]> = {};
