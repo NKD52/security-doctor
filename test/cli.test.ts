@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { reportConsole, reportJson } from '../src/utils/reporter.js';
 import { Finding } from '../src/rules/types.js';
+import { Scanner } from '../src/engine.js';
 
 describe('CLI Console Reporter Formatting', () => {
   let logSpy: any;
@@ -111,5 +112,12 @@ describe('CLI Console Reporter Formatting', () => {
     expect(loggedOutput).toContain('test.ts');
     expect(loggedOutput).toContain('SEC001');
     expect(loggedOutput).toContain('SEC006');
+  });
+
+  it('should track scanned files list in Scanner.scannedFiles', async () => {
+    const scanner = new Scanner({ cwd: process.cwd() });
+    await scanner.scan('test');
+    expect(scanner.scannedFiles.length).toBeGreaterThan(0);
+    expect(scanner.scannedFiles.some(f => f.endsWith('rules.test.ts') || f.endsWith('cli.test.ts'))).toBe(true);
   });
 });

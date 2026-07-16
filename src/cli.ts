@@ -80,6 +80,7 @@ program
   .option('--fail-under <score>', 'exit with code 1 if health score is under this threshold', parseInt)
   .option('--install', 'detect active AI coding agents and append security guidelines')
   .option('--verbose', 'print full findings list in interactive terminal')
+  .option('--scan-list', 'display the list of all scanned files')
   .action(async (dir, options) => {
     if (options.install) {
       installAgentInstructions(process.cwd());
@@ -98,8 +99,25 @@ program
         diffLines
       });
 
+      const isInteractive = process.stdout.isTTY && !options.json;
+      if (isInteractive) {
+        process.stdout.write(pc.cyan('🔍 Scanning codebase...'));
+      }
+
       const findings = await scanner.scan(dir);
       const score = calculateScore(findings);
+
+      if (isInteractive) {
+        process.stdout.write('\r' + ' '.repeat(30) + '\r');
+      }
+
+      if (options.scanList && !options.json) {
+        console.log(pc.bold(`Scanned files (${scanner.scannedFiles.length}):`));
+        for (const file of scanner.scannedFiles) {
+          console.log(pc.gray(`  - ${file}`));
+        }
+        console.log('');
+      }
 
       if (options.json) {
         reportJson(findings, score);

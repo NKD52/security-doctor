@@ -42,6 +42,7 @@ export class Scanner {
   private cwd: string;
   private config: Config;
   private diffLines?: Record<string, Set<number>>;
+  public scannedFiles: string[] = [];
 
   constructor(options: ScanOptions = {}) {
     this.cwd = options.cwd || process.cwd();
@@ -78,10 +79,7 @@ export class Scanner {
       dot: true
     });
 
-    console.log(`[DIAGNOSTIC] Scanned files list (${entries.length} files):`);
-    for (const entry of entries) {
-      console.log(`  - ${entry}`);
-    }
+    this.scannedFiles = [...entries];
 
     const allFindings: Finding[] = [];
     const enabledRules = rules.filter(r => {
