@@ -235,4 +235,88 @@ describe('SEC007: SQL Injection Taint Tracking', () => {
     const findings = scanner.scanFile('test-path-safe.ts', code);
     expect(findings.length).toBe(0);
   });
+
+  it('SEC010: XSS / HTML Injection', () => {
+    const code = `
+      // Positive Case: Tainted value in HTML response (XSS)
+      app.get('/xss', (req, res) => {
+        const name = req.query.name;
+        res.send("<div>" + name + "</div>");
+      });
+
+      // Negative Case 1: Sanitized response (safe)
+      app.get('/clean1', (req, res) => {
+        const name = req.query.name;
+        const clean = escapeHtml(name);
+        res.send("<div>" + clean + "</div>");
+      });
+
+      // Negative Case 2: Library Sanitization (safe)
+      app.get('/clean2', (req, res) => {
+        const name = req.query.name;
+        const clean = DOMPurify.sanitize(name);
+        res.write(\`<div>\${clean}</div>\`);
+      });
+
+      // Negative Case 3: API Response (JSON, safe)
+      app.get('/json', (req, res) => {
+        const name = req.query.name;
+        res.json({ user: name });
+      });
+    `;
+    const findings = scanner.scanFile('test-xss.ts', code);
+    expect(findings.length).toBe(1);
+    expect(findings[0].ruleId).toBe('SEC010');
+    expect(findings[0].severity).toBe('critical');
+  });
+
+  it('SEC011: NoSQL Injection', () => {
+    const code = `
+      // Positive Case 1: Entire filter object user-controlled
+      app.get('/nosql1', (req, res) => {
+        const filter = req.query;
+        db.collection.find(filter);
+      });
+
+      // Positive Case 2: Tainted target inside operator ($where evaluation)
+      app.get('/nosql2', (req, res) => {
+        const user = req.body.username;
+        db.users.findOne({ $where: "this.username === '" + user + "'" });
+      });
+
+      // Negative Case 1: Hardcoded keys with leaf taint (safe)
+      app.get('/nosql-safe1', (req, res) => {
+        const user = req.body.username;
+        db.users.find({ username: user });
+      });
+
+      // Negative Case 2: Sanitized / Coerced values (safe)
+      app.get('/nosql-safe2', (req, res) => {
+        const user = req.body.username;
+        db.users.findOne({ $where: String(user) });
+      });
+
+      // Negative Case 3: Types.ObjectId coercion (safe)
+      app.get('/nosql-safe3', (req, res) => {
+        const id = req.query.id;
+        db.users.deleteOne({ _id: mongoose.Types.ObjectId(id) });
+      });
+
+      // Negative Case 4: Array.find False Positive Check (safe)
+      app.get('/array-find', (req, res) => {
+        const id = req.query.id;
+        const user = items.find(x => x.id === id);
+      });
+    `;
+    const findings = scanner.scanFile('test-nosql.ts', code);
+    expect(findings.length).toBe(2);
+    
+    expect(findings[0].ruleId).toBe('SEC011');
+    expect(findings[0].severity).toBe('critical');
+    expect(findings[0].message).toContain('entire query filter object');
+
+    expect(findings[1].ruleId).toBe('SEC011');
+    expect(findings[1].severity).toBe('critical');
+    expect(findings[1].message).toContain('query operator');
+  });
 });
