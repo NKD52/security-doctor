@@ -78,6 +78,11 @@ export class Scanner {
       dot: true
     });
 
+    console.log(`[DIAGNOSTIC] Scanned files list (${entries.length} files):`);
+    for (const entry of entries) {
+      console.log(`  - ${entry}`);
+    }
+
     const allFindings: Finding[] = [];
     const enabledRules = rules.filter(r => {
       const ruleConfig = this.config.rules?.[r.id] as any;
