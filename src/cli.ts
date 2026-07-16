@@ -79,6 +79,7 @@ program
   .option('--diff <base>', 'only report findings on lines changed since <base> commit/branch')
   .option('--fail-under <score>', 'exit with code 1 if health score is under this threshold', parseInt)
   .option('--install', 'detect active AI coding agents and append security guidelines')
+  .option('--verbose', 'print full findings list in interactive terminal')
   .action(async (dir, options) => {
     if (options.install) {
       installAgentInstructions(process.cwd());
@@ -103,7 +104,7 @@ program
       if (options.json) {
         reportJson(findings, score);
       } else {
-        reportConsole(findings, score);
+        reportConsole(findings, score, { verbose: !!options.verbose });
         await offerCiIntegration();
       }
 
