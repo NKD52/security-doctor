@@ -75,6 +75,7 @@ describe('CLI Console Reporter Formatting', () => {
 
     // Should contain the metrics summary
     expect(loggedOutput).toContain('Scanned 10 files · 2 issues found · 1 files affected');
+    expect(loggedOutput).toContain('Security > 1 critical, 1 medium');
 
     // Should contain the Top Issue box with relative paths and impact delta
     expect(loggedOutput).toContain('🚨 TOP ISSUE');
@@ -101,8 +102,9 @@ describe('CLI Console Reporter Formatting', () => {
     // Should contain the ASCII gauge border box characters
     expect(loggedOutput).toContain('┌' + '─'.repeat(58) + '┐');
     
-    // Should contain metrics summary
+    // Should contain metrics summary and severity summary
     expect(loggedOutput).toContain('Scanned 10 files · 2 issues found · 1 files affected');
+    expect(loggedOutput).toContain('Security > 1 critical, 1 medium');
 
     // Should contain the Top Issue box
     expect(loggedOutput).toContain('🚨 TOP ISSUE');
