@@ -14,11 +14,11 @@ function getStringValue(node: any): string | null {
 const SENSITIVE_WORDS = ['key', 'secret', 'password', 'passwd', 'pwd', 'token', 'auth', 'credential', 'private'];
 const PASSWORD_WORDS = ['password', 'passwd', 'pwd'];
 
-function isSuspiciousStorageKey(key: string): { isSuspicious: boolean; isPassword: boolean } {
-  // Split key by camelCase, snake_case, or kebab-case boundaries
+export function isSuspiciousStorageKey(key: string): { isSuspicious: boolean; isPassword: boolean } {
+  // Split key by camelCase, snake_case, kebab-case, colon-namespaces, or dot-namespaces
   const words = key
     .replace(/([A-Z])/g, '_$1')
-    .split(/[_-]/)
+    .split(/[_.:-]/)
     .map(w => w.toLowerCase())
     .filter(w => w.length > 0);
 
@@ -26,6 +26,26 @@ function isSuspiciousStorageKey(key: string): { isSuspicious: boolean; isPasswor
   const isPassword = words.some(w => PASSWORD_WORDS.includes(w));
 
   return { isSuspicious, isPassword };
+}
+
+export function isStorageReceiver(node: any): boolean {
+  if (!node) return false;
+  if (node.type === 'Identifier') {
+    return node.name === 'localStorage' || node.name === 'sessionStorage';
+  }
+  if (node.type === 'MemberExpression') {
+    const obj = node.object;
+    const prop = node.property;
+    if (
+      obj.type === 'Identifier' &&
+      (obj.name === 'window' || obj.name === 'globalThis') &&
+      prop.type === 'Identifier' &&
+      (prop.name === 'localStorage' || prop.name === 'sessionStorage')
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export const sec012Storage: Rule = {
@@ -40,8 +60,7 @@ export const sec012Storage: Rule = {
         const callee = path.node.callee;
         if (
           callee.type === 'MemberExpression' &&
-          callee.object.type === 'Identifier' &&
-          (callee.object.name === 'localStorage' || callee.object.name === 'sessionStorage') &&
+          isStorageReceiver(callee.object) &&
           callee.property.type === 'Identifier' &&
           callee.property.name === 'setItem'
         ) {
