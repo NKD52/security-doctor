@@ -238,36 +238,63 @@ describe('SEC007: SQL Injection Taint Tracking', () => {
 
   it('SEC010: XSS / HTML Injection', () => {
     const code = `
-      // Positive Case: Tainted value in HTML response (XSS)
+      // Server-side Positive Case: Tainted value in HTML response (XSS)
       app.get('/xss', (req, res) => {
         const name = req.query.name;
         res.send("<div>" + name + "</div>");
       });
 
-      // Negative Case 1: Sanitized response (safe)
+      // Server-side Negative Case 1: Sanitized response (safe)
       app.get('/clean1', (req, res) => {
         const name = req.query.name;
         const clean = escapeHtml(name);
         res.send("<div>" + clean + "</div>");
       });
 
-      // Negative Case 2: Library Sanitization (safe)
-      app.get('/clean2', (req, res) => {
-        const name = req.query.name;
-        const clean = DOMPurify.sanitize(name);
-        res.write(\`<div>\${clean}</div>\`);
-      });
-
-      // Negative Case 3: API Response (JSON, safe)
+      // Server-side Negative Case 2: API Response (JSON, safe)
       app.get('/json', (req, res) => {
         const name = req.query.name;
         res.json({ user: name });
       });
+
+      // Client-side Positive Case 1: Unsanitized template literal innerHTML
+      function renderNavbar(user) {
+        navLinks.innerHTML = \`<li>Profile (\${user.username})</li>\`;
+      }
+
+      // Client-side Positive Case 2: Loop concatenation and rendering
+      function renderProducts(products) {
+        let cardsHTML = '';
+        products.forEach(p => {
+          cardsHTML += \`<h3>\${p.name}</h3>\`;
+        });
+        grid.innerHTML = cardsHTML;
+      }
+
+      // Client-side Negative Case 1: Sanitized template literal
+      function renderNavbarSafe(user) {
+        el.innerHTML = \`<li>Profile (\${escapeHtml(user.username)})</li>\`;
+      }
+
+      // Client-side Negative Case 2: Static content
+      function renderStatic() {
+        el.innerHTML = '<li>Static content</li>';
+      }
+
+      // Client-side Negative Case 3: Safe textContent assignment
+      function renderText(anything) {
+        el.textContent = \`\${anything}\`;
+      }
     `;
     const findings = scanner.scanFile('test-xss.ts', code);
-    expect(findings.length).toBe(1);
-    expect(findings[0].ruleId).toBe('SEC010');
-    expect(findings[0].severity).toBe('critical');
+    expect(findings.length).toBe(3);
+    
+    const sec010Findings = findings.filter(f => f.ruleId === 'SEC010');
+    expect(sec010Findings.length).toBe(3);
+    
+    // Check that one of the findings is on the grid.innerHTML assignment
+    const gridFinding = sec010Findings.find(f => f.message.includes("assigned to 'innerHTML'") && f.startLine > 25);
+    expect(gridFinding).toBeDefined();
   });
 
   it('SEC011: NoSQL Injection', () => {

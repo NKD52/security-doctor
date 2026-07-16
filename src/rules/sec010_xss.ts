@@ -151,7 +151,6 @@ export const sec010Xss: Rule = {
           }
         },
         AssignmentExpression(assignPath: any) {
-          if (assignPath.getFunctionParent() !== path) return;
           const { left, right, operator } = assignPath.node;
           
           // Check innerHTML/outerHTML assignments
@@ -160,6 +159,19 @@ export const sec010Xss: Rule = {
             left.property.type === 'Identifier' &&
             (left.property.name === 'innerHTML' || left.property.name === 'outerHTML')
           ) {
+            if (assignPath.getFunctionParent() !== path) {
+              let parent = assignPath.getFunctionParent();
+              let isNested = false;
+              while (parent) {
+                if (parent === path) {
+                  isNested = true;
+                  break;
+                }
+                parent = parent.getFunctionParent();
+              }
+              if (!isNested) return;
+            }
+
             if (isUnsanitizedDynamic(right, xssDirtyVars)) {
               context.report(
                 assignPath,
@@ -173,6 +185,12 @@ export const sec010Xss: Rule = {
           // Standard variable assignment
           if (left.type === 'Identifier') {
             const name = left.name;
+            const binding = assignPath.scope.getBinding(name);
+            const belongsToCurrentFunction = binding && (binding.scope.getFunctionParent() === path.scope);
+            
+            if (assignPath.getFunctionParent() !== path && !belongsToCurrentFunction) {
+              return;
+            }
 
             // Server-side
             if (operator === '=') {
