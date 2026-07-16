@@ -4,7 +4,7 @@ import { Finding } from '../src/rules/types.js';
 
 describe('CLI Console Reporter Formatting', () => {
   let logSpy: any;
-  let originalTTY: boolean | undefined;
+  let originalTTY: any;
 
   beforeEach(() => {
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
