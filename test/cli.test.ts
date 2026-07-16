@@ -57,9 +57,9 @@ describe('CLI Console Reporter Formatting', () => {
     expect(loggedOutput).toContain('73/100');
   });
 
-  it('should format output with ASCII gauge and Top Issue box when isTTY is true', () => {
+  it('should format output with ASCII gauge and Top Issue box when isTTY is true (non-verbose)', () => {
     process.stdout.isTTY = true;
-    reportConsole(mockFindings, 73);
+    reportConsole(mockFindings, 73, { verbose: false });
 
     const loggedOutput = logSpy.mock.calls.map((c: any) => c[0]).join('\n');
     
@@ -69,6 +69,10 @@ describe('CLI Console Reporter Formatting', () => {
     expect(loggedOutput).toContain('Fair');
     expect(loggedOutput).toContain('└' + '─'.repeat(58) + '┘');
 
+    // Should contain the vulnerable files list
+    expect(loggedOutput).toContain('Vulnerable files:');
+    expect(loggedOutput).toContain('test.ts');
+
     // Should contain the Top Issue box
     expect(loggedOutput).toContain('🚨 TOP ISSUE:');
     expect(loggedOutput).toContain('SEC001');
@@ -76,5 +80,36 @@ describe('CLI Console Reporter Formatting', () => {
     expect(loggedOutput).toContain('Severity:');
     expect(loggedOutput).toContain('CRITICAL');
     expect(loggedOutput).toContain('Message:  Potential hardcoded secret found.');
+    expect(loggedOutput).toContain('🛡️ Impact:');
+    expect(loggedOutput).toContain('Fixing this prevents accidental leakage of private API credentials');
+
+    // Should contain the help tip
+    expect(loggedOutput).toContain('💡 Tip: Found 2 total vulnerabilities. Use the --verbose flag to display the full list of findings.');
+
+    // Since non-verbose, it should NOT print the full findings list below (e.g. details of SEC006 shouldn't be printed)
+    expect(loggedOutput).not.toContain('SEC006: Cookie created without httpOnly.');
+  });
+
+  it('should format output with ASCII gauge and full list when isTTY is true and verbose is true', () => {
+    process.stdout.isTTY = true;
+    reportConsole(mockFindings, 73, { verbose: true });
+
+    const loggedOutput = logSpy.mock.calls.map((c: any) => c[0]).join('\n');
+    
+    // Should contain the ASCII gauge border box characters
+    expect(loggedOutput).toContain('┌' + '─'.repeat(58) + '┐');
+    
+    // Should contain vulnerable files
+    expect(loggedOutput).toContain('Vulnerable files:');
+    expect(loggedOutput).toContain('test.ts');
+
+    // Should contain the Top Issue box
+    expect(loggedOutput).toContain('🚨 TOP ISSUE:');
+    
+    // Since verbose, it SHOULD print the full findings list below
+    expect(loggedOutput).toContain('Found 2 vulnerabilities:');
+    expect(loggedOutput).toContain('test.ts');
+    expect(loggedOutput).toContain('SEC001');
+    expect(loggedOutput).toContain('SEC006');
   });
 });
