@@ -1,12 +1,33 @@
 {
   "name": "security-doctor",
-  "version": "1.0.0",
-  "description": "Security-focused CLI tool for JS/TS codebases",
-  "main": "dist/index.js",
+  "version": "0.1.0",
+  "description": "Security-focused CLI tool for JS/TS codebases — catches the vulnerabilities AI coding agents actually introduce, and installs its rules as guidance for your coding agent.",
+  "type": "module",
   "bin": {
     "security-doctor": "dist/cli.js"
   },
-  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nkd52/security-doctor"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "security",
+    "static-analysis",
+    "sast",
+    "cli",
+    "ai-coding-agent",
+    "vulnerability-scanner",
+    "sql-injection",
+    "xss",
+    "taint-tracking"
+  ],
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
