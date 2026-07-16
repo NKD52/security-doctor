@@ -78,49 +78,86 @@ function getChangedFilesCount(base: string): number {
   }
 }
 
-function generateFixPrompt(findings: any[], topIssueOnly: boolean = false): string {
+function generateFixPrompt(findings: any[], limit?: number): string {
   if (findings.length === 0) return '';
-  const grouped: Record<string, any[]> = {};
-  
-  if (topIssueOnly) {
-    const severityWeights: Record<string, number> = {
-      critical: 4,
-      high: 3,
-      medium: 2,
-      low: 1
-    };
-    let topIssue = findings[0];
-    for (const f of findings) {
-      if (severityWeights[f.severity] > severityWeights[topIssue.severity]) {
-        topIssue = f;
+
+  // 1. Deduplicate by ruleId + message
+  const uniqueEntries: {
+    ruleId: string;
+    severity: string;
+    message: string;
+    suggestedFix?: string;
+    locations: string[];
+  }[] = [];
+
+  for (const f of findings) {
+    const relPath = path.relative(process.cwd(), f.filePath).replace(/\\/g, '/');
+    const locStr = `${relPath}:${f.startLine}:${f.startColumn}`;
+    
+    const existing = uniqueEntries.find(e => e.ruleId === f.ruleId && e.message === f.message);
+    if (existing) {
+      if (!existing.locations.includes(locStr)) {
+        existing.locations.push(locStr);
       }
+    } else {
+      uniqueEntries.push({
+        ruleId: f.ruleId,
+        severity: f.severity,
+        message: f.message,
+        suggestedFix: f.suggestedFix,
+        locations: [locStr]
+      });
     }
-    const relPath = path.relative(process.cwd(), topIssue.filePath).replace(/\\/g, '/');
-    let prompt = `Fix the following security issue in ${relPath}:\n`;
-    prompt += `- ${topIssue.ruleId} (${topIssue.severity.toUpperCase()}): ${topIssue.message}\n`;
-    if (topIssue.suggestedFix) {
-      prompt += `  👉 Fix: ${topIssue.suggestedFix}\n`;
+  }
+
+  // 2. Sort by severity weights
+  const severityWeights: Record<string, number> = {
+    critical: 4,
+    high: 3,
+    medium: 2,
+    low: 1
+  };
+
+  uniqueEntries.sort((a, b) => {
+    const wa = severityWeights[a.severity] || 0;
+    const wb = severityWeights[b.severity] || 0;
+    return wb - wa;
+  });
+
+  // 3. Slice to limit
+  const targets = limit ? uniqueEntries.slice(0, limit) : uniqueEntries;
+
+  // 4. Format prompt text
+  let prompt = '';
+  if (limit === 1) {
+    const entry = targets[0];
+    if (!entry) return '';
+    const locs = entry.locations.join(', ');
+    prompt += `Fix the following security issue in ${locs}:\n`;
+    prompt += `1. [${entry.severity.toUpperCase()}] ${entry.ruleId}: ${entry.message}\n`;
+    if (entry.suggestedFix) {
+      prompt += `   👉 Fix: ${entry.suggestedFix}\n`;
     }
-    return prompt.trim();
   } else {
-    let prompt = 'Please fix the following security vulnerabilities in the codebase:\n\n';
-    for (const f of findings) {
-      const relPath = path.relative(process.cwd(), f.filePath).replace(/\\/g, '/');
-      if (!grouped[relPath]) grouped[relPath] = [];
-      grouped[relPath].push(f);
-    }
-    for (const [relPath, fileFindings] of Object.entries(grouped)) {
-      prompt += `File: ${relPath}\n`;
-      for (const f of fileFindings) {
-        prompt += `- ${f.ruleId} (${f.severity.toUpperCase()}): ${f.message}\n`;
-        if (f.suggestedFix) {
-          prompt += `  👉 Fix: ${f.suggestedFix}\n`;
-        }
+    prompt += 'Please fix the following security vulnerabilities in the codebase:\n\n';
+    let idx = 1;
+    for (const entry of targets) {
+      const locs = entry.locations.map(loc => `\`${loc}\``).join(', ');
+      prompt += `${idx}. [${entry.severity.toUpperCase()}] ${entry.ruleId} at ${locs}:\n`;
+      prompt += `   Message: ${entry.message}\n`;
+      if (entry.suggestedFix) {
+        prompt += `   👉 Fix: ${entry.suggestedFix}\n`;
       }
       prompt += '\n';
+      idx++;
     }
-    return prompt.trim();
+    prompt = prompt.trim();
   }
+
+  // 5. Add priority closing instruction
+  prompt += '\n\nPlease address the issues listed above in the order of their priority (critical and high severity issues first).';
+
+  return prompt;
 }
 
 function copyToClipboard(text: string, label: string) {
@@ -135,18 +172,14 @@ function copyToClipboard(text: string, label: string) {
   }
 }
 
-async function runActionMenu(findings: any[], score: number, scannedFilesCount: number, verbose: boolean) {
+async function runActionMenu(findings: any[], score: number, scannedFilesCount: number) {
   if (findings.length === 0) return;
 
   while (true) {
     console.log(''); // full blank line before menu
     console.log('What\'s next?');
-    console.log('  [1] Fix this now with an AI coding agent');
-    if (verbose) {
-      console.log(`  [2] Copy a fix prompt for all ${findings.length} findings to clipboard`);
-    } else {
-      console.log('  [2] Copy a fix prompt for the top issue to clipboard');
-    }
+    console.log('  [1] Copy a fix prompt for the top issue to clipboard');
+    console.log(`  [2] Copy a fix prompt for all ${findings.length} issues to clipboard`);
     console.log('  [3] Install these rules as a coding-agent skill');
     console.log('  [4] Add automated scanning to GitHub Actions');
     console.log('  [5] Nothing, exit\n');
@@ -155,16 +188,11 @@ async function runActionMenu(findings: any[], score: number, scannedFilesCount: 
     const choice = answer.trim();
 
     if (choice === '1') {
-      const prompt = generateFixPrompt(findings, false);
-      copyToClipboard(prompt, 'AI Agent Handoff Prompt');
+      const prompt = generateFixPrompt(findings, 1);
+      copyToClipboard(prompt, 'Top Issue Fix Prompt');
     } else if (choice === '2') {
-      if (verbose) {
-        const prompt = generateFixPrompt(findings, false);
-        copyToClipboard(prompt, 'All Findings Fix Prompt');
-      } else {
-        const prompt = generateFixPrompt(findings, true);
-        copyToClipboard(prompt, 'Top Issue Fix Prompt');
-      }
+      const prompt = generateFixPrompt(findings, undefined);
+      copyToClipboard(prompt, 'All Findings Fix Prompt');
     } else if (choice === '3') {
       installAgentInstructions(process.cwd());
     } else if (choice === '4') {
@@ -201,6 +229,7 @@ program
   .option('--install', 'detect active AI coding agents and append security guidelines')
   .option('--verbose', 'print full findings list in interactive terminal')
   .option('--scan-list', 'display the list of all scanned files')
+  .option('--all', 'disable pagination and print all findings in TTY mode')
   .action(async (dir, options) => {
     if (options.install) {
       installAgentInstructions(process.cwd());
@@ -258,12 +287,14 @@ program
       if (options.json) {
         reportJson(findings, score);
       } else {
-        reportConsole(findings, score, {
+        await reportConsole(findings, score, {
           verbose: !!options.verbose,
-          scannedFilesCount: scanner.scannedFiles.length
+          scannedFilesCount: scanner.scannedFiles.length,
+          all: !!options.all
         });
         if (process.stdout.isTTY && process.env.GITHUB_ACTIONS !== 'true') {
-          await runActionMenu(findings, score, scanner.scannedFiles.length, !!options.verbose);
+          await new Promise(resolve => setTimeout(resolve, 200));
+          await runActionMenu(findings, score, scanner.scannedFiles.length);
         }
       }
 

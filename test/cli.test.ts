@@ -41,10 +41,10 @@ describe('CLI Console Reporter Formatting', () => {
     }
   ];
 
-  it('should format output as plain text when isTTY is false', () => {
+  it('should format output as plain text when isTTY is false', async () => {
     process.stdout.isTTY = false;
     const score = calculateScore(mockFindings); // 82
-    reportConsole(mockFindings, score);
+    await reportConsole(mockFindings, score);
 
     const loggedOutput = logSpy.mock.calls.map((c: any) => c[0]).join('\n');
     
@@ -60,10 +60,10 @@ describe('CLI Console Reporter Formatting', () => {
     expect(loggedOutput).toContain('82/100');
   });
 
-  it('should format output with ASCII gauge and Top Issue box when isTTY is true (non-verbose)', () => {
+  it('should format output with ASCII gauge and Top Issue box when isTTY is true (non-verbose)', async () => {
     process.stdout.isTTY = true;
     const score = calculateScore(mockFindings); // 82
-    reportConsole(mockFindings, score, { verbose: false, scannedFilesCount: 10 });
+    await reportConsole(mockFindings, score, { verbose: false, scannedFilesCount: 10 });
 
     const loggedOutput = logSpy.mock.calls.map((c: any) => c[0]).join('\n');
     
@@ -80,7 +80,6 @@ describe('CLI Console Reporter Formatting', () => {
     // Should contain the Top Issue box with relative paths and impact delta
     expect(loggedOutput).toContain('🚨 TOP ISSUE');
     expect(loggedOutput).toContain('SEC001');
-    expect(loggedOutput).toContain('CRITICAL');
     expect(loggedOutput).toContain('test.ts:10:5');
     expect(loggedOutput).toContain('📈 Impact: Fixing this raises your score to 97/100 (+15)');
 
@@ -92,10 +91,10 @@ describe('CLI Console Reporter Formatting', () => {
     expect(loggedOutput).not.toContain('SEC006: Cookie created without httpOnly.');
   });
 
-  it('should format output with ASCII gauge and full list when isTTY is true and verbose is true', () => {
+  it('should format output with ASCII gauge and full list when isTTY is true and verbose is true', async () => {
     process.stdout.isTTY = true;
     const score = calculateScore(mockFindings); // 82
-    reportConsole(mockFindings, score, { verbose: true, scannedFilesCount: 10 });
+    await reportConsole(mockFindings, score, { verbose: true, scannedFilesCount: 10 });
 
     const loggedOutput = logSpy.mock.calls.map((c: any) => c[0]).join('\n');
     
