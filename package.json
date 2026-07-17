@@ -1,6 +1,6 @@
 {
   "name": "security-doctor",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Security-focused CLI tool for JS/TS codebases — catches the vulnerabilities AI coding agents actually introduce, and installs its rules as guidance for your coding agent.",
   "type": "module",
   "bin": {
