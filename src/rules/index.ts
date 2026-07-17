@@ -14,6 +14,7 @@ import { sec012Storage } from './sec012_storage.js';
 import { sec013Rls } from './sec013_rls.js';
 import { sec014PermissivePolicy } from './sec014_permissive_policy.js';
 import { sec015ClientAuthFields } from './sec015_client_auth_fields.js';
+import { sec016IframeSandbox } from './sec016_iframe_sandbox.js';
 
 export const rules: Rule[] = [
   sec001Secrets,
@@ -30,7 +31,8 @@ export const rules: Rule[] = [
   sec012Storage,
   sec013Rls,
   sec014PermissivePolicy,
-  sec015ClientAuthFields
+  sec015ClientAuthFields,
+  sec016IframeSandbox
 ];
 
 export * from './types.js';
