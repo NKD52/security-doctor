@@ -36,9 +36,12 @@ export const sec013Rls: Rule = {
     
     // 1. Scan for CREATE TABLE if it's in migration directories
     if (isMigration) {
-      const createTableRegex = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:[a-zA-Z0-9_"]+\.)?([a-zA-Z0-9_"]+)/i;
+      const createTableRegex = /^\s*CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:[a-zA-Z0-9_"]+\.)?([a-zA-Z0-9_"]+)/i;
       for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
+        const line = lines[i].trim();
+        if (line.startsWith('--')) {
+          continue;
+        }
         const match = createTableRegex.exec(line);
         if (match) {
           const tableName = match[1].replace(/"/g, '').toLowerCase();
@@ -55,8 +58,12 @@ export const sec013Rls: Rule = {
     }
 
     // 2. Scan for ALTER TABLE ... ENABLE ROW LEVEL SECURITY globally across all files
-    const rlsRegex = /ALTER\s+TABLE\s+(?:(?:[a-zA-Z0-9_"]+\.)?([a-zA-Z0-9_"]+))\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY/i;
-    for (const line of lines) {
+    const rlsRegex = /^\s*ALTER\s+TABLE\s+(?:(?:[a-zA-Z0-9_"]+\.)?([a-zA-Z0-9_"]+))\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY/i;
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (line.startsWith('--')) {
+        continue;
+      }
       const match = rlsRegex.exec(line);
       if (match) {
         const tableName = match[1].replace(/"/g, '').toLowerCase();

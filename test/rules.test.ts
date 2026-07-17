@@ -347,12 +347,19 @@ describe('SEC013: Row Level Security Cross-File Scanning', () => {
     });
     const findings = await scanner.scan('test/fixtures/sql');
     
-    // Should find exactly 1 finding (foo is missing RLS)
+    // Should find exactly 3 findings (foo, orders, user_profiles are missing RLS)
     // bar has RLS in same file, baz has RLS in scripts/enable_baz.sql
-    expect(findings.length).toBe(1);
-    expect(findings[0].ruleId).toBe('SEC013');
-    expect(findings[0].message).toContain('Table "foo" created in migrations is missing Row Level Security.');
-    expect(findings[0].suggestedFix).toContain('Note: If RLS is enabled outside this repository\'s .sql files');
+    expect(findings.length).toBe(3);
+    
+    const fooFinding = findings.find(f => f.message.includes('"foo"'));
+    expect(fooFinding).toBeDefined();
+    expect(fooFinding!.suggestedFix).toContain('Note: If RLS is enabled outside this repository\'s .sql files');
+
+    const ordersFinding = findings.find(f => f.message.includes('"orders"'));
+    expect(ordersFinding).toBeDefined();
+
+    const profilesFinding = findings.find(f => f.message.includes('"user_profiles"'));
+    expect(profilesFinding).toBeDefined();
   });
 
   it('should not leak state between consecutive scans', async () => {
@@ -362,11 +369,11 @@ describe('SEC013: Row Level Security Cross-File Scanning', () => {
     
     // Scan 1
     const findings1 = await scanner.scan('test/fixtures/sql');
-    expect(findings1.length).toBe(1);
+    expect(findings1.length).toBe(3);
 
     // Scan 2
     const findings2 = await scanner.scan('test/fixtures/sql');
-    expect(findings2.length).toBe(1);
+    expect(findings2.length).toBe(3);
   });
 });
 
