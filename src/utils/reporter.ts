@@ -87,12 +87,29 @@ async function printGroupedFindings(
     const sevFindings = sortedFindings.filter(f => f.severity === sev);
     if (sevFindings.length === 0) continue;
 
-    const grouped: Record<string, Finding[]> = {};
+    interface GroupedEntry {
+      ruleId: string;
+      message: string;
+      suggestedFix?: string;
+      locations: { filePath: string; line: number; col: number }[];
+    }
+
+    const uniqueEntries: GroupedEntry[] = [];
     for (const f of sevFindings) {
-      if (!grouped[f.filePath]) {
-        grouped[f.filePath] = [];
+      const loc = { filePath: f.filePath, line: f.startLine, col: f.startColumn };
+      const existing = uniqueEntries.find(e => e.ruleId === f.ruleId && e.message === f.message);
+      if (existing) {
+        if (!existing.locations.some(l => l.filePath === loc.filePath && l.line === loc.line && l.col === loc.col)) {
+          existing.locations.push(loc);
+        }
+      } else {
+        uniqueEntries.push({
+          ruleId: f.ruleId,
+          message: f.message,
+          suggestedFix: f.suggestedFix,
+          locations: [loc]
+        });
       }
-      grouped[f.filePath].push(f);
     }
 
     const sevColor = 
@@ -103,19 +120,22 @@ async function printGroupedFindings(
     
     console.log(pc.bold(`${sevColor(sev.toUpperCase())} (${sevFindings.length})`));
 
-    for (const [filePath, fileFindings] of Object.entries(grouped)) {
-      const relPath = path.relative(process.cwd(), filePath).replace(/\\/g, '/');
-      console.log(`  ${pc.underline(pc.cyan(relPath))}`);
-      for (const f of fileFindings) {
-        const loc = pc.gray(`${f.startLine}:${f.startColumn}`);
-        console.log(`    ${loc}  ${pc.bold(f.ruleId)}: ${f.message}`);
-        if (f.suggestedFix) {
-          console.log(pc.green(`      👉 ${f.suggestedFix}`));
-        }
-        
-        if (process.env.GITHUB_ACTIONS === 'true') {
-          const annotationType = (f.severity === 'critical' || f.severity === 'high') ? 'error' : 'warning';
-          console.log(`::${annotationType} file=${f.filePath},line=${f.startLine},col=${f.startColumn},title=${f.ruleId}::${f.message}`);
+    for (const entry of uniqueEntries) {
+      console.log(`  ${pc.bold(entry.ruleId)}: ${entry.message}`);
+      if (entry.suggestedFix) {
+        console.log(pc.green(`    👉 ${entry.suggestedFix}`));
+      }
+      const locCount = entry.locations.length;
+      console.log(pc.gray(`    Found in ${locCount} location${locCount > 1 ? 's' : ''}:`));
+      for (const loc of entry.locations) {
+        const relPath = path.relative(process.cwd(), loc.filePath).replace(/\\/g, '/');
+        console.log(`      ${relPath}:${loc.line}:${loc.col}`);
+      }
+
+      if (process.env.GITHUB_ACTIONS === 'true') {
+        const annotationType = (sev === 'critical' || sev === 'high') ? 'error' : 'warning';
+        for (const loc of entry.locations) {
+          console.log(`::${annotationType} file=${loc.filePath},line=${loc.line},col=${loc.col},title=${entry.ruleId}::${entry.message}`);
         }
       }
     }
@@ -143,9 +163,17 @@ export async function reportConsole(
   }
 
   const isVerbose = !!opts.verbose;
+  const totalFiles = opts.scannedFilesCount || 1;
 
   // Check if we are running in an interactive terminal (TTY)
   if (process.stdout.isTTY) {
+    // 1. If verbose, print findings list first
+    if (isVerbose) {
+      await printGroupedFindings(findings, true, opts);
+      await sleep(200);
+    }
+
+    // 2. Score Box
     const barLength = 20;
     const filledCount = Math.round((score / 100) * barLength);
     const emptyCount = barLength - filledCount;
@@ -175,12 +203,12 @@ export async function reportConsole(
     console.log('└' + '─'.repeat(totalBoxWidth - 2) + '┘\n');
     await sleep(200);
 
-    // Scanned files metrics summary
+    // 3. Scanned files metrics summary
     const filesAffectedCount = new Set(findings.map(f => f.filePath)).size;
-    console.log(pc.gray(`Scanned ${opts.scannedFilesCount || 0} files · ${findings.length} issues found · ${filesAffectedCount} files affected`));
+    console.log(pc.gray(`Scanned ${totalFiles} files · ${findings.length} issues found · ${filesAffectedCount} files affected`));
     await sleep(200);
 
-    // Category/severity counts compact one-line summary
+    // 4. Category/severity counts compact one-line summary
     const critical = findings.filter(f => f.severity === 'critical').length;
     const high = findings.filter(f => f.severity === 'high').length;
     const medium = findings.filter(f => f.severity === 'medium').length;
@@ -199,7 +227,7 @@ export async function reportConsole(
     await sleep(200);
     console.log(''); // Blank line before Top Issue
 
-    // SURFACING TOP ISSUE
+    // 5. SURFACING TOP ISSUE
     const severityWeights: Record<string, number> = {
       critical: 4,
       high: 3,
@@ -214,15 +242,9 @@ export async function reportConsole(
       }
     }
 
-    const topSevColor = 
-      topIssue.severity === 'critical' ? pc.red :
-      topIssue.severity === 'high' ? pc.yellow :
-      topIssue.severity === 'medium' ? pc.magenta :
-      pc.blue;
-
     const remainingFindings = findings.filter(f => f !== topIssue);
-    const scoreWithFinding = calculateScore(findings);
-    const scoreWithoutTopIssue = calculateScore(remainingFindings);
+    const scoreWithFinding = calculateScore(findings, totalFiles);
+    const scoreWithoutTopIssue = calculateScore(remainingFindings, totalFiles);
     const delta = scoreWithoutTopIssue - scoreWithFinding;
     const newScore = scoreWithoutTopIssue;
     const topIssueRelPath = path.relative(process.cwd(), topIssue.filePath).replace(/\\/g, '/');
@@ -244,12 +266,7 @@ export async function reportConsole(
       return;
     }
 
-    // Verbose TTY Output
-    await printGroupedFindings(findings, true, opts);
-
-    const totalDeduction = findings.reduce((sum, f) => sum + getDeduction(f.severity), 0);
-    const maxPossibleScore = Math.min(100, score + totalDeduction);
-    console.log(`You could improve to ${maxPossibleScore}/100 by fixing all ${findings.length} issues.`);
+    console.log(`You could improve to 100/100 by fixing all ${findings.length} issues.`);
     console.log(pc.gray('─'.repeat(totalBoxWidth)));
     return;
   }
@@ -300,9 +317,6 @@ export async function reportConsole(
     pc.red;
 
   console.log(`${pc.bold('Health Score:')} ${scoreColor(`${score}/100`)}`);
-  if (score < 100) {
-    console.log(pc.gray(`Deductions based on severity levels: Critical (-15), High (-8), Medium (-3), Low (-1)`));
-  }
   console.log('');
 }
 
