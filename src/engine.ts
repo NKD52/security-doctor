@@ -57,20 +57,16 @@ export class Scanner {
     }
   }
 
-  private shouldSkipMinified(filePath: string, content: string, isJsonMode: boolean): boolean {
-    const relPath = path.relative(this.cwd, filePath).replace(/\\/g, '/');
-
+  private shouldSkipMinified(filePath: string, content: string): string | false {
     // 1. Sourcemap check
     const mapPath = filePath + '.map';
     if (fs.existsSync(mapPath)) {
-      if (!isJsonMode) console.log(pc.gray(`skipped ${relPath}: sourcemap detected`));
-      return true;
+      return 'sibling .map file detected';
     }
 
     const suffix = content.slice(-200);
     if (suffix.includes('//# sourceMappingURL=')) {
-      if (!isJsonMode) console.log(pc.gray(`skipped ${relPath}: sourcemap detected`));
-      return true;
+      return 'sourcemap comment detected';
     }
 
     // 2. Average line length check
@@ -78,14 +74,13 @@ export class Scanner {
     const lineCount = lines.length || 1;
     const avgLineLen = content.length / lineCount;
     if (avgLineLen > 200) {
-      if (!isJsonMode) console.log(pc.gray(`skipped ${relPath}: avg line length ${Math.round(avgLineLen)} exceeds threshold`));
-      return true;
+      return `avg line length ${Math.round(avgLineLen)} exceeds threshold`;
     }
 
     return false;
   }
 
-  async scan(targetDir: string = '.'): Promise<Finding[]> {
+  async scan(targetDir: string = '.', onProgress?: (index: number, total: number) => void): Promise<Finding[]> {
     const absoluteTargetDir = path.resolve(this.cwd, targetDir);
     
     // Resolve ignore patterns
@@ -125,11 +120,22 @@ export class Scanner {
     });
 
     const isJsonMode = process.argv.includes('--json');
+    let index = 0;
+    const total = entries.length;
 
     for (const filePath of entries) {
       try {
+        index++;
+        if (onProgress) {
+          onProgress(index, total);
+        }
         const content = fs.readFileSync(filePath, 'utf8');
-        if (this.shouldSkipMinified(filePath, content, isJsonMode)) {
+        const skipReason = this.shouldSkipMinified(filePath, content);
+        if (skipReason) {
+          if (!isJsonMode) {
+            const relPath = path.relative(this.cwd, filePath).replace(/\\/g, '/');
+            console.log(pc.gray(`skipped ${relPath}: ${skipReason}`));
+          }
           continue;
         }
         const fileFindings = this.scanFile(filePath, content, enabledRules);
