@@ -69,6 +69,11 @@ export class Scanner {
       return 'sourcemap comment detected';
     }
 
+    // Exclude .sql files from the average-line-length minification skip
+    if (filePath.endsWith('.sql')) {
+      return false;
+    }
+
     // 2. Average line length check
     const lines = content.split(/\r?\n/);
     const lineCount = lines.length || 1;
