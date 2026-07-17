@@ -124,4 +124,56 @@ describe('CLI Console Reporter Formatting', () => {
     expect(scanner.scannedFiles.length).toBeGreaterThan(0);
     expect(scanner.scannedFiles.some(f => f.endsWith('rules.test.ts') || f.endsWith('cli.test.ts'))).toBe(true);
   });
+
+  describe('Impact Delta Floor Handling', () => {
+    it('deeply floored score (8 criticals) - delta reflects real formula (+0)', async () => {
+      process.stdout.isTTY = true;
+      const findings: Finding[] = Array(8).fill(null).map((_, i) => ({
+        ruleId: 'SEC001',
+        severity: 'critical',
+        message: `Leak ${i}`,
+        filePath: '/absolute/path/test.ts',
+        startLine: 10 + i,
+        startColumn: 5
+      }));
+      const score = calculateScore(findings); // 0
+      await reportConsole(findings, score);
+      const loggedOutput = logSpy.mock.calls.map((c: any) => c[0]).join('\n');
+      expect(loggedOutput).toContain('📈 Impact: Fixing this raises your score to 0/100 (+0)');
+    });
+
+    it('floored score (7 criticals) where removing top issue lifts unclamped score above 0 - delta is +10', async () => {
+      process.stdout.isTTY = true;
+      const findings: Finding[] = Array(7).fill(null).map((_, i) => ({
+        ruleId: 'SEC001',
+        severity: 'critical',
+        message: `Leak ${i}`,
+        filePath: '/absolute/path/test.ts',
+        startLine: 10 + i,
+        startColumn: 5
+      }));
+      const score = calculateScore(findings); // 0
+      await reportConsole(findings, score);
+      const loggedOutput = logSpy.mock.calls.map((c: any) => c[0]).join('\n');
+      expect(loggedOutput).toContain('📈 Impact: Fixing this raises your score to 10/100 (+10)');
+    });
+
+    it('non-floored score regression - delta remains correct', async () => {
+      process.stdout.isTTY = true;
+      const findings: Finding[] = [
+        {
+          ruleId: 'SEC001',
+          severity: 'critical',
+          message: 'Leak',
+          filePath: '/absolute/path/test.ts',
+          startLine: 10,
+          startColumn: 5
+        }
+      ];
+      const score = calculateScore(findings); // 85
+      await reportConsole(findings, score);
+      const loggedOutput = logSpy.mock.calls.map((c: any) => c[0]).join('\n');
+      expect(loggedOutput).toContain('📈 Impact: Fixing this raises your score to 100/100 (+15)');
+    });
+  });
 });
