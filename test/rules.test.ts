@@ -196,8 +196,8 @@ describe('Scoring Logic', () => {
       { severity: 'low' }       // 1
     ];
     
-    // total = 27. files = 100. penalty = 27 / 100 * 50 = 13.5. score = Math.round(100 - 13.5) = 87
-    expect(calculateScore(mockFindings, 100)).toBe(87);
+    // total = 27. files = 100. penalty = 27 / 100 * 60 = 16.2. score = Math.round(100 - 16.2) = 84
+    expect(calculateScore(mockFindings, 100)).toBe(84);
 
     // Should floor at 0
     const worstFindings = Array(10).fill({ severity: 'critical' });
@@ -267,7 +267,7 @@ describe('Configuration Overrides', () => {
     const scannerDefault = new Scanner();
     const findingsDefault = scannerDefault.scanFile('test.ts', code);
     expect(findingsDefault[0].severity).toBe('high');
-    expect(calculateScore(findingsDefault, 100)).toBe(96); // 100 - 8/100*50
+    expect(calculateScore(findingsDefault, 100)).toBe(95); // 100 - 8/100*60 = 95.2 -> 95
 
     // 2. Override to critical (deducts 15 points)
     const scannerCritical = new Scanner({
@@ -279,7 +279,7 @@ describe('Configuration Overrides', () => {
     });
     const findingsCritical = scannerCritical.scanFile('test.ts', code);
     expect(findingsCritical[0].severity).toBe('critical');
-    expect(calculateScore(findingsCritical, 100)).toBe(93); // 100 - 15/100*50
+    expect(calculateScore(findingsCritical, 100)).toBe(91); // 100 - 15/100*60 = 91
 
     // 3. Override to low (deducts 1 point)
     const scannerLow = new Scanner({
@@ -291,7 +291,7 @@ describe('Configuration Overrides', () => {
     });
     const findingsLow = scannerLow.scanFile('test.ts', code);
     expect(findingsLow[0].severity).toBe('low');
-    expect(calculateScore(findingsLow, 100)).toBe(100); // 100 - 1/100*50 = 99.5 -> 100
+    expect(calculateScore(findingsLow, 100)).toBe(99); // 100 - 1/100*60 = 99.4 -> 99
   });
 
   it('SEC012: Sensitive Data in Web Storage', () => {
