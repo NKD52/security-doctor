@@ -221,8 +221,10 @@ export async function reportConsole(
       pc.blue;
 
     const remainingFindings = findings.filter(f => f !== topIssue);
-    const newScore = calculateScore(remainingFindings);
-    const delta = newScore - score;
+    const scoreWithFinding = calculateScore(findings);
+    const scoreWithoutTopIssue = calculateScore(remainingFindings);
+    const delta = scoreWithoutTopIssue - scoreWithFinding;
+    const newScore = scoreWithoutTopIssue;
     const topIssueRelPath = path.relative(process.cwd(), topIssue.filePath).replace(/\\/g, '/');
 
     console.log(pc.bold(pc.red('🚨 TOP ISSUE')));
