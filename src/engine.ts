@@ -95,8 +95,8 @@ export class Scanner {
     const customIgnores = this.config.ignorePaths || [];
     const ignorePatterns = [...defaultIgnores, ...customIgnores];
 
-    // Find all JS/TS files
-    const entries = await fg(['**/*.{js,ts,jsx,tsx}'], {
+    // Find all JS/TS/SQL files
+    const entries = await fg(['**/*.{js,ts,jsx,tsx,sql}'], {
       cwd: absoluteTargetDir,
       absolute: true,
       ignore: ignorePatterns,
@@ -119,6 +119,13 @@ export class Scanner {
       return true;
     });
 
+    // Reset cross-file state for enabled rules
+    for (const rule of enabledRules) {
+      if (rule.reset) {
+        rule.reset();
+      }
+    }
+
     const isJsonMode = process.argv.includes('--json');
     let index = 0;
     const total = entries.length;
@@ -138,11 +145,29 @@ export class Scanner {
           }
           continue;
         }
+
+        if (filePath.endsWith('.sql')) {
+          for (const rule of enabledRules) {
+            if (rule.scanSql) {
+              rule.scanSql(filePath, content, this.config);
+            }
+          }
+          continue;
+        }
+
         const fileFindings = this.scanFile(filePath, content, enabledRules);
         allFindings.push(...fileFindings);
       } catch (err) {
         // Log parser errors or reading errors as warnings but don't fail the whole process
         console.warn(`Warning: Failed to scan file ${filePath}: ${(err as Error).message}`);
+      }
+    }
+
+    // Resolve cross-file rules
+    for (const rule of enabledRules) {
+      if (rule.resolve) {
+        const resolvedFindings = rule.resolve(this.config);
+        allFindings.push(...resolvedFindings);
       }
     }
 

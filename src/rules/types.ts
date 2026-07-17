@@ -35,4 +35,7 @@ export interface Rule {
   description: string;
   agentInstruction?: string;
   createVisitor: (context: RuleContext) => Visitor;
+  reset?: () => void;
+  scanSql?: (filePath: string, content: string, config: Config) => void;
+  resolve?: (config: Config) => Finding[];
 }
