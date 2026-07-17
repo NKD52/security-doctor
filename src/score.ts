@@ -1,7 +1,7 @@
 import { Finding } from './rules/types.js';
 
-export function calculateScore(findings: Finding[], totalFilesScanned: number): number {
-  const scalingFactor = 50; // provisional placeholder to be tuned
+export function calculateScore(findings: Finding[], totalFilesScanned: number = 1): number {
+  const scalingFactor = 60; // tuned against LIGMA, friend's, and HR repos
   let totalWeight = 0;
   for (const f of findings) {
     switch (f.severity) {
