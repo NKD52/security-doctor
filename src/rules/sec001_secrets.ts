@@ -23,6 +23,9 @@ function findSecretValues(node: any, varName: string): SecretResult[] {
   // 1. Direct string/template literal check
   const directVal = getStringValue(node);
   if (directVal) {
+    if (directVal.startsWith('http://') || directVal.startsWith('https://')) {
+      return [];
+    }
     if (isLikelySecret(varName, directVal)) {
       return [{ value: directVal, isFallback: false }];
     }
