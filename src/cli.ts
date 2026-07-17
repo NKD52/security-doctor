@@ -266,14 +266,18 @@ program
 
       const isInteractive = process.stdout.isTTY && !options.json;
       if (isInteractive) {
-        process.stdout.write(pc.cyan('🔍 Scanning codebase...'));
+        process.stdout.write(pc.cyan('🔍 Scanning codebase... (0/0)'));
       }
 
-      const findings = await scanner.scan(dir);
+      const findings = await scanner.scan(dir, (index, total) => {
+        if (isInteractive) {
+          process.stdout.write(`\r${pc.cyan(`🔍 Scanning codebase... (${index}/${total})`)}`);
+        }
+      });
       const score = calculateScore(findings);
 
       if (isInteractive) {
-        process.stdout.write('\r' + ' '.repeat(30) + '\r');
+        process.stdout.write('\r' + ' '.repeat(50) + '\r');
       }
 
       if (options.scanList && !options.json) {
