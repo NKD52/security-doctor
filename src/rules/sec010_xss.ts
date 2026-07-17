@@ -102,6 +102,28 @@ function isUnsanitizedDynamic(node: any, xssDirtyVars: Set<string>): boolean {
   return false;
 }
 
+function isJSXDynamicExpression(node: any): boolean {
+  if (!node) return false;
+  if (
+    node.type === 'StringLiteral' ||
+    node.type === 'NumericLiteral' ||
+    node.type === 'BooleanLiteral' ||
+    node.type === 'NullLiteral'
+  ) {
+    return false;
+  }
+  if (node.type === 'TemplateLiteral' && node.expressions.length === 0) {
+    return false;
+  }
+  if (isSanitizedExpression(node)) {
+    return false;
+  }
+  if (node.type === 'BinaryExpression' && node.operator === '+') {
+    return isJSXDynamicExpression(node.left) || isJSXDynamicExpression(node.right);
+  }
+  return true;
+}
+
 export const sec010Xss: Rule = {
   id: 'SEC010',
   title: 'Prevent XSS and HTML Injection',
@@ -240,6 +262,45 @@ export const sec010Xss: Rule = {
                     'Potential HTML Injection / XSS vulnerability. Untrusted user input is sent directly in a response.',
                     'Escape user input before rendering it, or use res.json() to return data instead of HTML.'
                   );
+                }
+              }
+            }
+          }
+        },
+        JSXAttribute(attrPath: any) {
+          if (attrPath.getFunctionParent() !== path) {
+            let parent = attrPath.getFunctionParent();
+            let isNested = false;
+            while (parent) {
+              if (parent === path) {
+                isNested = true;
+                break;
+              }
+              parent = parent.getFunctionParent();
+            }
+            if (!isNested) return;
+          }
+
+          const node = attrPath.node;
+          if (node.name && node.name.name === 'dangerouslySetInnerHTML') {
+            const value = node.value;
+            if (value && value.type === 'JSXExpressionContainer') {
+              const expr = value.expression;
+              if (expr && expr.type === 'ObjectExpression') {
+                const htmlProp = expr.properties.find((p: any) =>
+                  p.type === 'ObjectProperty' &&
+                  ((p.key.type === 'Identifier' && p.key.name === '__html') ||
+                   (p.key.type === 'StringLiteral' && p.key.value === '__html'))
+                );
+                if (htmlProp) {
+                  const htmlValue = htmlProp.value;
+                  if (isJSXDynamicExpression(htmlValue)) {
+                    context.report(
+                      attrPath,
+                      `Potential XSS vulnerability. Untrusted user input is passed to 'dangerouslySetInnerHTML' without HTML escaping.`,
+                      `Pass the input through a sanitizer (e.g. DOMPurify.sanitize()) before assigning it to dangerouslySetInnerHTML.`
+                    );
+                  }
                 }
               }
             }

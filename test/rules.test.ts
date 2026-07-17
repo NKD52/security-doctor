@@ -345,7 +345,7 @@ describe('SEC013: Row Level Security Cross-File Scanning', () => {
     const scanner = new Scanner({
       cwd: process.cwd()
     });
-    const findings = await scanner.scan('test/fixtures/sql');
+    const findings = (await scanner.scan('test/fixtures/sql')).filter(f => f.ruleId === 'SEC013');
     
     // Should find exactly 4 findings (foo, orders, user_profiles, sync_audit are missing RLS)
     // bar has RLS in same file, baz has RLS in scripts/enable_baz.sql
@@ -372,12 +372,106 @@ describe('SEC013: Row Level Security Cross-File Scanning', () => {
     });
     
     // Scan 1
-    const findings1 = await scanner.scan('test/fixtures/sql');
+    const findings1 = (await scanner.scan('test/fixtures/sql')).filter(f => f.ruleId === 'SEC013');
     expect(findings1.length).toBe(4);
 
     // Scan 2
-    const findings2 = await scanner.scan('test/fixtures/sql');
+    const findings2 = (await scanner.scan('test/fixtures/sql')).filter(f => f.ruleId === 'SEC013');
     expect(findings2.length).toBe(4);
+  });
+});
+
+describe('SEC010: JSX dangerouslySetInnerHTML Sink Checks', () => {
+  it('should flag dynamic dangerouslySetInnerHTML and pass static/sanitized values', () => {
+    const code = `
+      function App() {
+        const userInput = "test";
+        return (
+          <div>
+            {/* Positive Cases */}
+            <div dangerouslySetInnerHTML={{ __html: someFunc(userInput) }} />
+            <div dangerouslySetInnerHTML={{ __html: \`<p>\${userInput}</p>\` }} />
+
+            {/* Negative Cases */}
+            <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(userInput) }} />
+            <div dangerouslySetInnerHTML={{ __html: "<h1>Static</h1>" }} />
+          </div>
+        );
+      }
+    `;
+    const scanner = new Scanner();
+    const findings = scanner.scanFile('App.tsx', code);
+    const sec010 = findings.filter(f => f.ruleId === 'SEC010');
+    expect(sec010.length).toBe(2);
+  });
+});
+
+describe('SEC014: Permissive Supabase RLS Policy', () => {
+  it('should flag USING (true) or WITH CHECK (true) policies and ignore safe policies', async () => {
+    const scanner = new Scanner();
+    const findings = await scanner.scan('test/fixtures/sql');
+    const sec014 = findings.filter(f => f.ruleId === 'SEC014');
+    
+    expect(sec014.length).toBe(2);
+    expect(sec014[0].message).toContain('Permissive RLS policy detected');
+    expect(sec014[0].startLine).toBe(1);
+    expect(sec014[1].startLine).toBe(2);
+  });
+});
+
+describe('SEC015: Client Code Modifying Sensitive Auth Fields', () => {
+  it('should flag client calls supplying role/admin etc and ignore roleplay/adminNote', () => {
+    const code = `
+      // Positive cases
+      supabase.from('users').insert({ role: 'admin' });
+      supabase.from('users').update({ is_admin: true });
+      supabase.from('users').upsert([{ tenant_id: '123' }]);
+
+      // Negative cases
+      supabase.from('users').insert({ roleplay: 'game' });
+      supabase.from('users').update({ adminNote: 'note' });
+      supabase.from('users').insert({ normal_field: 'value' });
+    `;
+    const scanner = new Scanner();
+    const findings = scanner.scanFile('client.ts', code);
+    const sec015 = findings.filter(f => f.ruleId === 'SEC015');
+    
+    expect(sec015.length).toBe(3);
+  });
+});
+
+describe('SEC016: Missing Sandbox Attribute on iframe', () => {
+  it('should flag iframe without sandbox and pass if sandbox is present', () => {
+    const code = `
+      function App() {
+        return (
+          <div>
+            {/* Positive */}
+            <iframe src="https://example.com" />
+
+            {/* Negative */}
+            <iframe src="https://example.com" sandbox="" />
+            <iframe src="https://example.com" sandbox="allow-scripts" />
+          </div>
+        );
+      }
+    `;
+    const scanner = new Scanner();
+    const findings = scanner.scanFile('iframe.tsx', code);
+    const sec016 = findings.filter(f => f.ruleId === 'SEC016');
+    
+    expect(sec016.length).toBe(1);
+  });
+});
+
+describe('SEC017: BaaS Config and Sensitive Fields Exposed in Build Output', () => {
+  it('should flag builds with config + sensitive fields and ignore others or partial word matches', async () => {
+    const scanner = new Scanner();
+    const findings = await scanner.scan('test/fixtures/build');
+    const sec017 = findings.filter(f => f.ruleId === 'SEC017');
+    
+    expect(sec017.length).toBe(1);
+    expect(sec017[0].filePath.replace(/\\/g, '/')).toContain('test/fixtures/build/dist/positive_bundle.js');
   });
 });
 

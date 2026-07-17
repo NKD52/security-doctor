@@ -69,6 +69,11 @@ export class Scanner {
       return 'sourcemap comment detected';
     }
 
+    // Exclude .sql files from the average-line-length minification skip
+    if (filePath.endsWith('.sql')) {
+      return false;
+    }
+
     // 2. Average line length check
     const lines = content.split(/\r?\n/);
     const lineCount = lines.length || 1;
@@ -166,7 +171,7 @@ export class Scanner {
     // Resolve cross-file rules
     for (const rule of enabledRules) {
       if (rule.resolve) {
-        const resolvedFindings = rule.resolve(this.config);
+        const resolvedFindings = rule.resolve(this.config, absoluteTargetDir);
         allFindings.push(...resolvedFindings);
       }
     }

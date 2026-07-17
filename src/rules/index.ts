@@ -12,6 +12,10 @@ import { sec010Xss } from './sec010_xss.js';
 import { sec011NoSql } from './sec011_nosql.js';
 import { sec012Storage } from './sec012_storage.js';
 import { sec013Rls } from './sec013_rls.js';
+import { sec014PermissivePolicy } from './sec014_permissive_policy.js';
+import { sec015ClientAuthFields } from './sec015_client_auth_fields.js';
+import { sec016IframeSandbox } from './sec016_iframe_sandbox.js';
+import { sec017ExposedBaas } from './sec017_exposed_baas.js';
 
 export const rules: Rule[] = [
   sec001Secrets,
@@ -26,7 +30,11 @@ export const rules: Rule[] = [
   sec010Xss,
   sec011NoSql,
   sec012Storage,
-  sec013Rls
+  sec013Rls,
+  sec014PermissivePolicy,
+  sec015ClientAuthFields,
+  sec016IframeSandbox,
+  sec017ExposedBaas
 ];
 
 export * from './types.js';
