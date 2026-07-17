@@ -46,6 +46,8 @@ describe('Security Rules AST Scanning', () => {
       const timeout = process.env.TIMEOUT || 3000;
       const mode = process.env.NODE_ENV || 'development';
       const auth = process.env.AUTH || \`Bearer \${token}\`;
+      const ENDPOINT_URL = "https://api.example.com/oauth/token"; // URLs ignored
+      const webhook_secret_url = "http://localhost:3000/webhook"; // URLs ignored
     `;
     const findings = scanner.scanFile('test.ts', code);
     expect(findings.length).toBe(5);
@@ -307,6 +309,7 @@ describe('Configuration Overrides', () => {
       localStorage.setItem('authorId', post.authorId);
       localStorage.setItem('user', JSON.stringify(data.user));
       window.localStorage.setItem("app:theme", "dark");
+      sessionStorage.setItem("homepage:settings:v2", JSON.stringify(settings));
     `;
     const scanner = new Scanner();
     const findings = scanner.scanFile('test-storage.ts', code);
