@@ -36,7 +36,7 @@ export function isLikelySecret(
 
   // Check if variable name matches key secret/auth patterns
   const nameLower = varName.toLowerCase();
-  const isSecretVar = /key|secret|password|pwd|token|auth|credential|private/i.test(nameLower);
+  const isSecretVar = /api[_-]?key|secret|password|passwd|token|private[_-]?key|access[_-]?key|client[_-]?secret/i.test(nameLower);
   if (!isSecretVar) return false;
 
   // Filter out common placeholders and mock strings
