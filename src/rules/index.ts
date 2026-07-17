@@ -11,6 +11,7 @@ import { sec009PathTraversal } from './sec009_path_traversal.js';
 import { sec010Xss } from './sec010_xss.js';
 import { sec011NoSql } from './sec011_nosql.js';
 import { sec012Storage } from './sec012_storage.js';
+import { sec013Rls } from './sec013_rls.js';
 
 export const rules: Rule[] = [
   sec001Secrets,
@@ -24,7 +25,8 @@ export const rules: Rule[] = [
   sec009PathTraversal,
   sec010Xss,
   sec011NoSql,
-  sec012Storage
+  sec012Storage,
+  sec013Rls
 ];
 
 export * from './types.js';

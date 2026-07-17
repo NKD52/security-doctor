@@ -188,20 +188,20 @@ describe('Security Rules AST Scanning', () => {
 });
 
 describe('Scoring Logic', () => {
-  it('should compute exact health scores based on severity deduplication', () => {
+  it('should compute exact health scores based on density-normalized scoring', () => {
     const mockFindings: any[] = [
-      { severity: 'critical' }, // -15
-      { severity: 'high' },     // -8
-      { severity: 'medium' },   // -3
-      { severity: 'low' }       // -1
+      { severity: 'critical' }, // 15
+      { severity: 'high' },     // 8
+      { severity: 'medium' },   // 3
+      { severity: 'low' }       // 1
     ];
     
-    // 100 - 15 - 8 - 3 - 1 = 73
-    expect(calculateScore(mockFindings)).toBe(73);
+    // total = 27. files = 100. penalty = 27 / 100 * 60 = 16.2. score = Math.round(100 - 16.2) = 84
+    expect(calculateScore(mockFindings, 100)).toBe(84);
 
     // Should floor at 0
     const worstFindings = Array(10).fill({ severity: 'critical' });
-    expect(calculateScore(worstFindings)).toBe(0);
+    expect(calculateScore(worstFindings, 10)).toBe(0);
   });
 });
 
@@ -267,7 +267,7 @@ describe('Configuration Overrides', () => {
     const scannerDefault = new Scanner();
     const findingsDefault = scannerDefault.scanFile('test.ts', code);
     expect(findingsDefault[0].severity).toBe('high');
-    expect(calculateScore(findingsDefault)).toBe(92); // 100 - 8
+    expect(calculateScore(findingsDefault, 100)).toBe(95); // 100 - 8/100*60 = 95.2 -> 95
 
     // 2. Override to critical (deducts 15 points)
     const scannerCritical = new Scanner({
@@ -279,7 +279,7 @@ describe('Configuration Overrides', () => {
     });
     const findingsCritical = scannerCritical.scanFile('test.ts', code);
     expect(findingsCritical[0].severity).toBe('critical');
-    expect(calculateScore(findingsCritical)).toBe(85); // 100 - 15
+    expect(calculateScore(findingsCritical, 100)).toBe(91); // 100 - 15/100*60 = 91
 
     // 3. Override to low (deducts 1 point)
     const scannerLow = new Scanner({
@@ -291,7 +291,7 @@ describe('Configuration Overrides', () => {
     });
     const findingsLow = scannerLow.scanFile('test.ts', code);
     expect(findingsLow[0].severity).toBe('low');
-    expect(calculateScore(findingsLow)).toBe(99); // 100 - 1
+    expect(calculateScore(findingsLow, 100)).toBe(99); // 100 - 1/100*60 = 99.4 -> 99
   });
 
   it('SEC012: Sensitive Data in Web Storage', () => {
@@ -337,6 +337,47 @@ describe('Configuration Overrides', () => {
     const authFinding = findings.find(f => f.message.includes('authToken'));
     expect(authFinding).toBeDefined();
     expect(authFinding!.severity).toBe('high');
+  });
+});
+
+describe('SEC013: Row Level Security Cross-File Scanning', () => {
+  it('should correctly flag tables missing RLS and pass tables with cross-file or same-file RLS', async () => {
+    const scanner = new Scanner({
+      cwd: process.cwd()
+    });
+    const findings = await scanner.scan('test/fixtures/sql');
+    
+    // Should find exactly 4 findings (foo, orders, user_profiles, sync_audit are missing RLS)
+    // bar has RLS in same file, baz has RLS in scripts/enable_baz.sql
+    expect(findings.length).toBe(4);
+    
+    const fooFinding = findings.find(f => f.message.includes('"foo"'));
+    expect(fooFinding).toBeDefined();
+    expect(fooFinding!.suggestedFix).toContain('Note: If RLS is enabled outside this repository\'s .sql files');
+
+    const ordersFinding = findings.find(f => f.message.includes('"orders"'));
+    expect(ordersFinding).toBeDefined();
+
+    const profilesFinding = findings.find(f => f.message.includes('"user_profiles"'));
+    expect(profilesFinding).toBeDefined();
+
+    const syncAuditFinding = findings.find(f => f.message.includes('"sync_audit"'));
+    expect(syncAuditFinding).toBeDefined();
+    expect(syncAuditFinding!.startLine).toBe(7); // verified line 7 of 06_verbatim_sync_audit.sql
+  });
+
+  it('should not leak state between consecutive scans', async () => {
+    const scanner = new Scanner({
+      cwd: process.cwd()
+    });
+    
+    // Scan 1
+    const findings1 = await scanner.scan('test/fixtures/sql');
+    expect(findings1.length).toBe(4);
+
+    // Scan 2
+    const findings2 = await scanner.scan('test/fixtures/sql');
+    expect(findings2.length).toBe(4);
   });
 });
 
