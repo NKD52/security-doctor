@@ -12,6 +12,7 @@ import { sec010Xss } from './sec010_xss.js';
 import { sec011NoSql } from './sec011_nosql.js';
 import { sec012Storage } from './sec012_storage.js';
 import { sec013Rls } from './sec013_rls.js';
+import { sec014PermissivePolicy } from './sec014_permissive_policy.js';
 
 export const rules: Rule[] = [
   sec001Secrets,
@@ -26,7 +27,8 @@ export const rules: Rule[] = [
   sec010Xss,
   sec011NoSql,
   sec012Storage,
-  sec013Rls
+  sec013Rls,
+  sec014PermissivePolicy
 ];
 
 export * from './types.js';
