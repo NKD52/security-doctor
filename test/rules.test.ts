@@ -347,9 +347,9 @@ describe('SEC013: Row Level Security Cross-File Scanning', () => {
     });
     const findings = await scanner.scan('test/fixtures/sql');
     
-    // Should find exactly 3 findings (foo, orders, user_profiles are missing RLS)
+    // Should find exactly 4 findings (foo, orders, user_profiles, sync_audit are missing RLS)
     // bar has RLS in same file, baz has RLS in scripts/enable_baz.sql
-    expect(findings.length).toBe(3);
+    expect(findings.length).toBe(4);
     
     const fooFinding = findings.find(f => f.message.includes('"foo"'));
     expect(fooFinding).toBeDefined();
@@ -360,6 +360,10 @@ describe('SEC013: Row Level Security Cross-File Scanning', () => {
 
     const profilesFinding = findings.find(f => f.message.includes('"user_profiles"'));
     expect(profilesFinding).toBeDefined();
+
+    const syncAuditFinding = findings.find(f => f.message.includes('"sync_audit"'));
+    expect(syncAuditFinding).toBeDefined();
+    expect(syncAuditFinding!.startLine).toBe(7); // verified line 7 of 06_verbatim_sync_audit.sql
   });
 
   it('should not leak state between consecutive scans', async () => {
@@ -369,11 +373,11 @@ describe('SEC013: Row Level Security Cross-File Scanning', () => {
     
     // Scan 1
     const findings1 = await scanner.scan('test/fixtures/sql');
-    expect(findings1.length).toBe(3);
+    expect(findings1.length).toBe(4);
 
     // Scan 2
     const findings2 = await scanner.scan('test/fixtures/sql');
-    expect(findings2.length).toBe(3);
+    expect(findings2.length).toBe(4);
   });
 });
 
