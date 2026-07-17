@@ -274,7 +274,7 @@ program
           process.stdout.write(`\r${pc.cyan(`🔍 Scanning codebase... (${index}/${total})`)}`);
         }
       });
-      const score = calculateScore(findings);
+      const score = calculateScore(findings, scanner.scannedFiles.length);
 
       if (isInteractive) {
         process.stdout.write('\r' + ' '.repeat(50) + '\r');
