@@ -3,6 +3,7 @@ import * as path from 'path';
 import { parse } from '@babel/parser';
 import _traverse from '@babel/traverse';
 import fg from 'fast-glob';
+import pc from 'picocolors';
 import { rules } from './rules/index.js';
 import { Finding, Rule, RuleContext, Config } from './rules/types.js';
 
@@ -56,6 +57,34 @@ export class Scanner {
     }
   }
 
+  private shouldSkipMinified(filePath: string, content: string, isJsonMode: boolean): boolean {
+    const relPath = path.relative(this.cwd, filePath).replace(/\\/g, '/');
+
+    // 1. Sourcemap check
+    const mapPath = filePath + '.map';
+    if (fs.existsSync(mapPath)) {
+      if (!isJsonMode) console.log(pc.gray(`skipped ${relPath}: sourcemap detected`));
+      return true;
+    }
+
+    const suffix = content.slice(-200);
+    if (suffix.includes('//# sourceMappingURL=')) {
+      if (!isJsonMode) console.log(pc.gray(`skipped ${relPath}: sourcemap detected`));
+      return true;
+    }
+
+    // 2. Average line length check
+    const lines = content.split(/\r?\n/);
+    const lineCount = lines.length || 1;
+    const avgLineLen = content.length / lineCount;
+    if (avgLineLen > 200) {
+      if (!isJsonMode) console.log(pc.gray(`skipped ${relPath}: avg line length ${Math.round(avgLineLen)} exceeds threshold`));
+      return true;
+    }
+
+    return false;
+  }
+
   async scan(targetDir: string = '.'): Promise<Finding[]> {
     const absoluteTargetDir = path.resolve(this.cwd, targetDir);
     
@@ -95,9 +124,14 @@ export class Scanner {
       return true;
     });
 
+    const isJsonMode = process.argv.includes('--json');
+
     for (const filePath of entries) {
       try {
         const content = fs.readFileSync(filePath, 'utf8');
+        if (this.shouldSkipMinified(filePath, content, isJsonMode)) {
+          continue;
+        }
         const fileFindings = this.scanFile(filePath, content, enabledRules);
         allFindings.push(...fileFindings);
       } catch (err) {
