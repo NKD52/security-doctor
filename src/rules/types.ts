@@ -37,5 +37,5 @@ export interface Rule {
   createVisitor: (context: RuleContext) => Visitor;
   reset?: () => void;
   scanSql?: (filePath: string, content: string, config: Config) => void;
-  resolve?: (config: Config) => Finding[];
+  resolve?: (config: Config, targetDir?: string) => Finding[];
 }

@@ -20,11 +20,18 @@ export const sec017ExposedBaas: Rule = {
     findings = [];
   },
 
-  resolve(config) {
+  resolve(config, targetDir) {
+    const projectRoot = process.cwd();
     const files = fg.sync(
-      ['dist/**/*.{js,css,html}', 'build/**/*.{js,css,html}', '.next/**/*.{js,css,html}'],
-      { cwd: process.cwd(), absolute: true, dot: true }
+      ['**/dist/**/*.{js,css,html}', '**/build/**/*.{js,css,html}', '**/.next/**/*.{js,css,html}'],
+      { cwd: projectRoot, absolute: true, dot: true }
     );
+
+    const filterDir = targetDir ? path.resolve(targetDir) : projectRoot;
+    const filteredFiles = files.filter(file => {
+      const relative = path.relative(filterDir, file);
+      return !relative.startsWith('..') && !path.isAbsolute(relative);
+    });
 
     const baasPatterns = [
       /supabase\.co/gi,
@@ -35,7 +42,7 @@ export const sec017ExposedBaas: Rule = {
     
     const sensitiveFields = ['role', 'admin', 'tenant_id', 'org_id', 'owner_id', 'is_admin'];
 
-    for (const filePath of files) {
+    for (const filePath of filteredFiles) {
       try {
         const content = fs.readFileSync(filePath, 'utf8');
 

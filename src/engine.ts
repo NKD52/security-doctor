@@ -171,7 +171,7 @@ export class Scanner {
     // Resolve cross-file rules
     for (const rule of enabledRules) {
       if (rule.resolve) {
-        const resolvedFindings = rule.resolve(this.config);
+        const resolvedFindings = rule.resolve(this.config, absoluteTargetDir);
         allFindings.push(...resolvedFindings);
       }
     }

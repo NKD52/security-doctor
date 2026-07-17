@@ -265,6 +265,7 @@ export const sec010Xss: Rule = {
                 }
               }
             }
+          }
         },
         JSXAttribute(attrPath: any) {
           if (attrPath.getFunctionParent() !== path) {
