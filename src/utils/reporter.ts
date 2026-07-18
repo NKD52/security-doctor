@@ -256,7 +256,11 @@ export async function reportConsole(
     if (topIssue.suggestedFix) {
       console.log(pc.green(`  👉 Fix: ${topIssue.suggestedFix}`));
     }
-    console.log(pc.cyan(`  📈 Impact: Fixing this raises your score to ${newScore}/100 (+${delta})`));
+    if (delta === 0) {
+      console.log(pc.cyan(`  📈 Impact: Worth fixing regardless, it's a genuine vulnerability.`));
+    } else {
+      console.log(pc.cyan(`  📈 Impact: Fixing this raises your score to ${newScore}/100 (+${delta})`));
+    }
     console.log('\n' + pc.gray('─'.repeat(totalBoxWidth)));
     await sleep(200);
 

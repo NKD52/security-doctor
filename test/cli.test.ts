@@ -137,7 +137,7 @@ describe('CLI Console Reporter Formatting', () => {
       const score = calculateScore(findings, 10); // 0
       await reportConsole(findings, score, { scannedFilesCount: 10 });
       const loggedOutput = logSpy.mock.calls.map((c: any) => c[0]).join('\n');
-      expect(loggedOutput).toContain('📈 Impact: Fixing this raises your score to 0/100 (+0)');
+      expect(loggedOutput).toContain('📈 Impact: Worth fixing regardless, it\'s a genuine vulnerability.');
     });
 
     it('floored score (2 criticals) where removing top issue lifts unclamped score above 0 - delta is +10', async () => {

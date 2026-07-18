@@ -1,5 +1,28 @@
 import { Rule } from './types.js';
-import { isLikelySecret } from '../utils/entropy.js';
+import { isLikelySecret, shannonEntropy } from '../utils/entropy.js';
+
+let reportedLocations = new Set<string>();
+
+const CONFIDENT_SECRET_REGEXES = [
+  /sk_live_[a-zA-Z0-9_]{12,}/,
+  /sk_test_[a-zA-Z0-9_]{12,}/,
+  /pk_live_[a-zA-Z0-9_]{12,}/,
+  /pk_test_[a-zA-Z0-9_]{12,}/,
+  /xox[bapr]-[a-zA-Z0-9_]{10,}/,
+  /ghp_[a-zA-Z0-9_]{30,}/,
+  /github_pat_[a-zA-Z0-9_]{30,}/,
+  /AKIA[0-9A-Z]{16}/,
+  /amzn\.mws\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
+  /sq0csp-[0-9A-Za-z\-_]{22}/,
+  /sq0atp-[0-9A-Za-z\-_]{22}/
+];
+
+function reportSecret(context: any, path: any, msg: string, fix: string, secretValue: string) {
+  const key = `${context.filePath}:${secretValue}`;
+  if (reportedLocations.has(key)) return;
+  reportedLocations.add(key);
+  context.report(path, msg, fix);
+}
 
 function getStringValue(node: any): string | null {
   if (!node) return null;
@@ -56,6 +79,9 @@ export const sec001Secrets: Rule = {
   severity: 'critical',
   description: 'Detects hardcoded secrets, api keys, or passwords with high Shannon entropy.',
   agentInstruction: 'Never hardcode api keys, secrets, passwords, or private keys. Always reference them from environment variables (e.g. process.env).',
+  reset() {
+    reportedLocations.clear();
+  },
   createVisitor(context) {
     return {
       VariableDeclarator(path) {
@@ -64,16 +90,20 @@ export const sec001Secrets: Rule = {
           const secrets = findSecretValues(path.node.init, varName);
           for (const s of secrets) {
             if (s.isFallback) {
-              context.report(
+              reportSecret(
+                context,
                 path,
                 `Possible hardcoded credential used as a fallback for "${varName}". If the environment variable is unset, the app silently runs with this committed value instead of failing.`,
-                `Throw an error if the environment variable is missing (fail closed): throw new Error('${varName} must be set')`
+                `Throw an error if the environment variable is missing (fail closed): throw new Error('${varName} must be set')`,
+                s.value
               );
             } else {
-              context.report(
+              reportSecret(
+                context,
                 path,
                 `Potential hardcoded secret found in variable '${varName}'.`,
-                `Move the secret to environment variables (e.g., process.env.${varName.toUpperCase()}).`
+                `Move the secret to environment variables (e.g., process.env.${varName.toUpperCase()}).`,
+                s.value
               );
             }
           }
@@ -91,16 +121,20 @@ export const sec001Secrets: Rule = {
           const secrets = findSecretValues(path.node.value, name);
           for (const s of secrets) {
             if (s.isFallback) {
-              context.report(
+              reportSecret(
+                context,
                 path,
                 `Possible hardcoded credential used as a fallback for "${name}". If the environment variable is unset, the app silently runs with this committed value instead of failing.`,
-                `Throw an error if the environment variable is missing (fail closed): throw new Error('${name} must be set')`
+                `Throw an error if the environment variable is missing (fail closed): throw new Error('${name} must be set')`,
+                s.value
               );
             } else {
-              context.report(
+              reportSecret(
+                context,
                 path,
                 `Potential hardcoded secret found in property '${name}'.`,
-                `Reference this secret dynamically or use an environment variable.`
+                `Reference this secret dynamically or use an environment variable.`,
+                s.value
               );
             }
           }
@@ -112,17 +146,133 @@ export const sec001Secrets: Rule = {
           const secrets = findSecretValues(path.node.right, varName);
           for (const s of secrets) {
             if (s.isFallback) {
-              context.report(
+              reportSecret(
+                context,
                 path,
                 `Possible hardcoded credential used as a fallback for "${varName}". If the environment variable is unset, the app silently runs with this committed value instead of failing.`,
-                `Throw an error if the environment variable is missing (fail closed): throw new Error('${varName} must be set')`
+                `Throw an error if the environment variable is missing (fail closed): throw new Error('${varName} must be set')`,
+                s.value
               );
             } else {
-              context.report(
+              reportSecret(
+                context,
                 path,
                 `Potential hardcoded secret assigned to '${varName}'.`,
-                `Avoid assigning hardcoded secret values. Use environment variables.`
+                `Avoid assigning hardcoded secret values. Use environment variables.`,
+                s.value
               );
+            }
+          }
+        }
+      },
+      StringLiteral(path) {
+        const val = path.node.value;
+        if (!val) return;
+
+        // 1. Known-prefix fast-path
+        for (const regex of CONFIDENT_SECRET_REGEXES) {
+          if (regex.test(val)) {
+            reportSecret(
+              context,
+              path,
+              `Potential hardcoded credential or API key found with known prefix.`,
+              `Move the credential or secret to environment variables.`,
+              val
+            );
+            return;
+          }
+        }
+
+        // 2. Tokenized entropy scan
+        const tokens = val.split(/[?&=/\s:;!@#$%^&*()+\-[\]{}|\\"'`<>,.]+/);
+        for (let i = 0; i < tokens.length; i++) {
+          const token = tokens[i];
+          if (token.length >= 8) {
+            // Context-Aware Path
+            const precedingToken = i > 0 ? tokens[i - 1] : '';
+            if (precedingToken) {
+              const precedingLower = precedingToken.toLowerCase();
+              const isSecretName = /api[_-]?key|secret|password|passwd|token|private[_-]?key|access[_-]?key|client[_-]?secret|auth|authorization/i.test(precedingLower);
+              if (isSecretName && isLikelySecret(precedingToken, token)) {
+                reportSecret(
+                  context,
+                  path,
+                  `Potential hardcoded secret found in parameter/key '${precedingToken}'.`,
+                  `Reference this secret dynamically or use an environment variable.`,
+                  val
+                );
+                return;
+              }
+            }
+
+            // Unlabeled Fallback Path
+            if (token.length >= 20 && !token.startsWith('data:')) {
+              const entropy = shannonEntropy(token);
+              if (entropy > 4.5) {
+                reportSecret(
+                  context,
+                  path,
+                  `Potential hardcoded secret found (unlabeled high-entropy string).`,
+                  `Move the credential or secret to environment variables.`,
+                  val
+                );
+                return;
+              }
+            }
+          }
+        }
+      },
+      TemplateLiteral(path) {
+        for (const quasi of path.node.quasis) {
+          const val = quasi.value.cooked;
+          if (!val) continue;
+
+          for (const regex of CONFIDENT_SECRET_REGEXES) {
+            if (regex.test(val)) {
+              reportSecret(
+                context,
+                path,
+                `Potential hardcoded credential or API key found with known prefix.`,
+                `Move the credential or secret to environment variables.`,
+                val
+              );
+              return;
+            }
+          }
+
+          const tokens = val.split(/[?&=/\s:;!@#$%^&*()+\-[\]{}|\\"'`<>,.]+/);
+          for (let i = 0; i < tokens.length; i++) {
+            const token = tokens[i];
+            if (token.length >= 8) {
+              const precedingToken = i > 0 ? tokens[i - 1] : '';
+              if (precedingToken) {
+                const precedingLower = precedingToken.toLowerCase();
+                const isSecretName = /api[_-]?key|secret|password|passwd|token|private[_-]?key|access[_-]?key|client[_-]?secret|auth|authorization/i.test(precedingLower);
+                if (isSecretName && isLikelySecret(precedingToken, token)) {
+                  reportSecret(
+                    context,
+                    path,
+                    `Potential hardcoded secret found in parameter/key '${precedingToken}'.`,
+                    `Reference this secret dynamically or use an environment variable.`,
+                    val
+                  );
+                  return;
+                }
+              }
+
+              if (token.length >= 20 && !token.startsWith('data:')) {
+                const entropy = shannonEntropy(token);
+                if (entropy > 4.5) {
+                  reportSecret(
+                    context,
+                    path,
+                    `Potential hardcoded secret found (unlabeled high-entropy string).`,
+                    `Move the credential or secret to environment variables.`,
+                    val
+                  );
+                  return;
+                }
+              }
             }
           }
         }
