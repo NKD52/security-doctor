@@ -1,6 +1,9 @@
 name: 'Security Doctor Scan'
 description: 'Statically scan TypeScript and JavaScript files for security vulnerabilities.'
 author: 'NKD52'
+branding:
+  icon: 'shield'
+  color: 'red'
 inputs:
   path:
     description: 'Path to scan.'
